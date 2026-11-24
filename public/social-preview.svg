@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b58aff"/>
+      <stop offset="1" stop-color="#65e9e8"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#8558e8" stop-opacity=".48"/>
+      <stop offset="1" stop-color="#05060a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#05060a"/>
+  <circle cx="900" cy="280" r="390" fill="url(#glow)"/>
+  <g stroke="#ffffff" stroke-opacity=".08">
+    <path d="M0 100H1200M0 200H1200M0 300H1200M0 400H1200M0 500H1200"/>
+    <path d="M100 0V630M200 0V630M300 0V630M400 0V630M500 0V630M600 0V630M700 0V630M800 0V630M900 0V630M1000 0V630M1100 0V630"/>
+  </g>
+  <text x="90" y="155" fill="#a7a4b4" font-family="Arial,sans-serif" font-size="23" letter-spacing="7">INDEPENDENT AI VIDEO CREATOR</text>
+  <text x="85" y="300" fill="#f5f4fa" font-family="Arial,sans-serif" font-size="112" font-weight="bold" letter-spacing="-8">CROWN</text>
+  <text x="85" y="410" fill="url(#g)" font-family="Arial,sans-serif" font-size="112" font-weight="bold" letter-spacing="-8">DEX.</text>
+  <text x="92" y="490" fill="#c4c0d0" font-family="Arial,sans-serif" font-size="27">Crafting AI Worlds. Creating Visual Impact.</text>
+  <text x="92" y="570" fill="#888695" font-family="Arial,sans-serif" font-size="17" letter-spacing="5">AI FILMMAKING  /  PRODUCT VISUALS  /  STORYTELLING</text>
+</svg>
