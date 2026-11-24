@@ -211,15 +211,76 @@ function Poster({ work, index, compact = false }: { work: Work; index: number; c
   return <div className={`cdx-poster cdx-palette-${index % 5} ${work.thumbnail ? 'cdx-has-thumb' : ''}`} style={work.thumbnail ? { backgroundImage: `url("${work.thumbnail}")` } : undefined}>
     <div className="cdx-poster-grid" aria-hidden="true"/>
     {!work.thumbnail && <><div className="cdx-poster-disc"/><div className="cdx-poster-ring"/><div className="cdx-poster-streak"/></>}
-    <div className="cdx-poster-header"><span>CDX / {String(index + 1).padStart(2, '0')}</span><span>VISUAL FILE</span></div>
+    <div className="cdx-poster-header"><span>CDX / {String(index + 1).padStart(2, '0')}</span><span>{work.video_url ? 'FILM PREVIEW' : 'X ORIGINAL'}</span></div>
     <div className="cdx-poster-center"><span>{work.category}</span><b>{compact ? 'C/D' : titleFor(work, index)}</b></div>
     <div className="cdx-poster-bottom"><span>ORIGINAL CREATIVE WORK</span><span>↗</span></div>
   </div>;
 }
 
+function formatFilmDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.floor(seconds % 60);
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
 function WorkCard({ work, index, open, big = false }: { work: Work; index: number; open: () => void; big?: boolean }) {
   const reduced = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [duration, setDuration] = useState('');
+
+  // Uploaded MP4/WebM films preview silently while the card is in view.
+  // The observer pauses off-screen videos to avoid wasting bandwidth.
+  useEffect(() => {
+    const card = ref.current;
+    const video = videoRef.current;
+    if (!card || !video || !work.video_url || reduced) return;
+
+    let wantsPlayback = false;
+    const playPreview = () => {
+      if (wantsPlayback || document.visibilityState !== 'visible') return;
+      wantsPlayback = true;
+      video.muted = true;
+      const playback = video.play();
+      if (playback) playback.then(() => setPreviewPlaying(true)).catch(() => {
+        wantsPlayback = false;
+        setPreviewPlaying(false);
+      });
+    };
+    const pausePreview = () => {
+      wantsPlayback = false;
+      video.pause();
+      setPreviewPlaying(false);
+    };
+
+    if (!('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0];
+      if (entry?.isIntersecting && entry.intersectionRatio >= .55) playPreview();
+      else pausePreview();
+    }, { threshold: [0, .55, .85] });
+
+    observer.observe(card);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pausePreview();
+        return;
+      }
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight * .15 && rect.top < window.innerHeight * .85) playPreview();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      wantsPlayback = false;
+      video.pause();
+    };
+  }, [work.video_url, reduced]);
+
   function tilt(event: ReactMouseEvent<HTMLDivElement>) {
     if (reduced || !window.matchMedia('(hover: hover)').matches || !ref.current) return;
     const r = event.currentTarget.getBoundingClientRect();
@@ -231,11 +292,20 @@ function WorkCard({ work, index, open, big = false }: { work: Work; index: numbe
     ref.current.style.setProperty('--my', `${(yp * 100).toFixed(2)}%`);
   }
   const reset = () => { if (ref.current) { ref.current.style.setProperty('--tilt-x', '0deg'); ref.current.style.setProperty('--tilt-y', '0deg'); } };
+  const openFilm = () => {
+    videoRef.current?.pause();
+    setPreviewPlaying(false);
+    open();
+  };
+
   return <motion.article className={`cdx-work-card ${big ? 'cdx-work-big' : ''}`} initial={{ opacity: 0, y: 44 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .13 }} transition={{ duration: .66 }}>
     <div className="cdx-tilt" ref={ref} onMouseMove={tilt} onMouseLeave={reset}>
-      <button className="cdx-poster-button" type="button" onClick={open} onPointerEnter={event => { if (event.pointerType === "mouse") { const clip = event.currentTarget.querySelector<HTMLVideoElement>(".cdx-poster-video"); void clip?.play().catch(() => {}); } }} onPointerLeave={event => { event.currentTarget.querySelector<HTMLVideoElement>(".cdx-poster-video")?.pause(); }} aria-label={`Play ${titleFor(work, index)}`}>
-        <Poster work={work} index={index}/>{work.video_url && <video className="cdx-poster-video" src={work.video_url} muted playsInline loop preload="none" />}<span className="cdx-card-shine" aria-hidden="true"/><span className="cdx-card-corner" aria-hidden="true">VIEW THE FILM ↗</span>
-        <span className="cdx-poster-play"><Play fill="currentColor" size={19}/><span>PLAY FILM</span></span>
+      <button className={`cdx-poster-button ${previewPlaying ? 'is-previewing' : ''}`} type="button" onClick={openFilm} aria-label={`Play ${titleFor(work, index)}`}>
+        <Poster work={work} index={index}/>
+        {work.video_url && <video ref={videoRef} className={`cdx-poster-video ${previewPlaying ? 'is-playing' : ''}`} src={work.video_url} poster={work.thumbnail || undefined} muted playsInline loop preload="metadata" aria-hidden="true" onLoadedMetadata={event => setDuration(formatFilmDuration(event.currentTarget.duration))} onPlay={() => setPreviewPlaying(true)} onPause={() => setPreviewPlaying(false)} />}
+        {work.video_url && <><span className="cdx-video-status">{previewPlaying ? 'NOW PLAYING · MUTED' : 'VIDEO PREVIEW'}</span><span className="cdx-video-duration">{duration || 'FILM'}</span></>}
+        <span className="cdx-card-shine" aria-hidden="true"/><span className="cdx-card-corner" aria-hidden="true">VIEW THE FILM ↗</span>
+        <span className="cdx-poster-play"><Play fill="currentColor" size={19}/><span>{previewPlaying ? 'OPEN FILM' : 'PLAY FILM'}</span></span>
       </button>
       <div className="cdx-work-meta"><div><span className="cdx-overline">{work.category} <i/> PROJECT {String(index + 1).padStart(2, '0')}</span><h3>{titleFor(work, index)}</h3></div><a href={work.url || work.video_url || "#work"} target="_blank" rel="noopener noreferrer" aria-label={`Open ${titleFor(work, index)}`}><ArrowUpRight size={20}/></a></div>
     </div>
@@ -287,7 +357,7 @@ function FilmViewer({ work, allWorks, onClose, onPrev, onNext }: { work: Work; a
   return <motion.div className="cdx-film-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <motion.section role="dialog" aria-modal="true" aria-label={`Watch ${titleFor(work, index)}`} className="cdx-film-modal" initial={{ y: 36, scale: .97 }} animate={{ y: 0, scale: 1 }} exit={{ y: 20, opacity: 0 }} transition={{ duration: .3 }}>
       <div className="cdx-film-head"><div><span className="cdx-overline">NOW SHOWING / {String(index + 1).padStart(2, '0')} OF {String(allWorks.length).padStart(2, '0')}</span><h3>{titleFor(work, index)}</h3></div><button ref={closeRef} onClick={onClose} aria-label="Close viewer"><X size={22}/></button></div>
-      <div className="cdx-film-stage">{work.video_url && <video key={work.video_url} className="cdx-native-video" src={work.video_url} controls playsInline preload="metadata" autoPlay={false}/>}<div ref={embedRef} className="cdx-x-frame"/>{state === 'loading' && <div className="cdx-film-message"><span className="cdx-spinner"/>Opening the official X player…</div>}{state === 'failed' && <div className="cdx-film-fallback"><Film size={34}/><h4>Watch the original on X</h4><p>The embedded player is unavailable here, but you can still open the original video.</p><a href={work.url || work.video_url} target="_blank" rel="noopener noreferrer">OPEN VIDEO <ExternalLink size={16}/></a></div>}</div>
+      <div className="cdx-film-stage">{work.video_url && <video key={work.video_url} className="cdx-native-video" src={work.video_url} controls playsInline preload="metadata" autoPlay muted poster={work.thumbnail || undefined}/>}<div ref={embedRef} className="cdx-x-frame"/>{state === 'loading' && <div className="cdx-film-message"><span className="cdx-spinner"/>Opening the official X player…</div>}{state === 'failed' && <div className="cdx-film-fallback"><Film size={34}/><h4>Watch the original on X</h4><p>The embedded player is unavailable here, but you can still open the original video.</p><a href={work.url || work.video_url} target="_blank" rel="noopener noreferrer">OPEN VIDEO <ExternalLink size={16}/></a></div>}</div>
       <div className="cdx-film-foot"><div className="cdx-film-controls"><button onClick={onPrev} aria-label="Previous project"><ChevronLeft/></button><button onClick={onNext} aria-label="Next project"><ChevronRight/></button></div><a href={work.url || work.video_url} target="_blank" rel="noopener noreferrer">{work.url ? "OPEN POST ON X" : "OPEN VIDEO"} <ArrowUpRight size={16}/></a></div>
     </motion.section>
   </motion.div>;
@@ -388,8 +458,8 @@ export default function CrownDEXV4() {
         <div className="cdx-hero-floor"><span>SCROLL TO ENTER THE STUDIO</span><ArrowDownRight size={18}/><span className="cdx-floor-right">© {new Date().getFullYear()} CROWNDEX / ALL ORIGINAL WORK</span></div>
       </section>
       <div className="cdx-marquee" aria-label="Creative disciplines"><div className="cdx-marquee-track">{Array.from({length: 2}).map((_,i) => <div className="cdx-marquee-group" key={i}>{['AI SHORT FILMS', 'PRODUCT ADVERTISEMENTS', 'CINEMATIC MOTION', 'CREATIVE DIRECTION', 'VISUAL WORLDS'].map(name => <span key={name}>{name}<b>✳</b></span>)}</div>)}</div></div>
-      <section className="cdx-section cdx-selected" id="selected"><div className="cdx-section-heading"><div><span className="cdx-overline">01 / THE SELECTED REEL</span><h2>Frames with <em>feeling.</em></h2></div><p>A few frames from the CrownDEX universe. Each one leads to the original creation on X.</p></div><div className="cdx-selected-grid">{featured.map(w => <WorkCard key={w.id} work={w} index={works.indexOf(w)} big={w.id === featured[0]?.id} open={() => setActiveIndex(works.indexOf(w))}/>)}</div></section>
-      <section className="cdx-section cdx-all" id="work"><div className="cdx-section-heading"><div><span className="cdx-overline">02 / EVERY CREATION</span><h2>The moving <em>archive.</em></h2></div><p>Watch through the official X player, or jump straight to the original post.</p></div><div className="cdx-filter-bar" role="group" aria-label="Project categories">{categories.map(c => <button key={c} className={c === category ? 'cdx-filter-active' : ''} aria-pressed={c === category} onClick={() => setCategory(c)}>{c} <span>{c === 'All' ? works.length : works.filter(w => w.category === c).length}</span></button>)}</div><motion.div layout className="cdx-all-grid"><AnimatePresence mode="popLayout">{filtered.map(w => <motion.div key={w.id} layout initial={{ opacity: 0, scale: .94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .94 }} transition={{ duration: .3 }}><WorkCard work={w} index={works.indexOf(w)} open={() => setActiveIndex(works.indexOf(w))}/></motion.div>)}</AnimatePresence></motion.div></section>
+      <section className="cdx-section cdx-selected" id="selected"><div className="cdx-section-heading"><div><span className="cdx-overline">01 / THE SELECTED REEL</span><h2>Frames with <em>feeling.</em></h2></div><p>Explore the films in motion. Uploaded videos preview right here; original X posts remain one click away.</p></div><div className="cdx-selected-grid">{featured.map(w => <WorkCard key={w.id} work={w} index={works.indexOf(w)} big={w.id === featured[0]?.id} open={() => setActiveIndex(works.indexOf(w))}/>)}</div></section>
+      <section className="cdx-section cdx-all" id="work"><div className="cdx-section-heading"><div><span className="cdx-overline">02 / EVERY CREATION</span><h2>The moving <em>archive.</em></h2></div><p>Films play silently as they enter view. Open any project for the full video player and its original post.</p></div><div className="cdx-filter-bar" role="group" aria-label="Project categories">{categories.map(c => <button key={c} className={c === category ? 'cdx-filter-active' : ''} aria-pressed={c === category} onClick={() => setCategory(c)}>{c} <span>{c === 'All' ? works.length : works.filter(w => w.category === c).length}</span></button>)}</div><motion.div layout className="cdx-all-grid"><AnimatePresence mode="popLayout">{filtered.map(w => <motion.div key={w.id} layout initial={{ opacity: 0, scale: .94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .94 }} transition={{ duration: .3 }}><WorkCard work={w} index={works.indexOf(w)} open={() => setActiveIndex(works.indexOf(w))}/></motion.div>)}</AnimatePresence></motion.div></section>
       <section className="cdx-section cdx-about cdx-v3-about" id="studio">
         <div className="cdx-about-art"><StudioIdentity/></div>
         <div className="cdx-about-copy">

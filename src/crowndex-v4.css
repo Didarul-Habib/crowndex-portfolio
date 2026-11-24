@@ -247,7 +247,9 @@
   line-height:1.17;
   -webkit-text-stroke:1px rgba(237,229,255,.78);
 }
-.cdx-kinetic-letters{display:inline-flex;flex:0 0 auto;vertical-align:baseline;white-space:nowrap;max-width:100%;align-items:baseline}.cdx-hero h1 .cdx-kinetic-letters{display:inline-flex;white-space:nowrap}.cdx-hero h1 .cdx-kinetic-char{display:inline-block;flex:0 0 auto;white-space:pre}
+.cdx-kinetic-letters{display:inline-flex;flex:0 0 auto;vertical-align:baseline;white-space:nowrap;max-width:100%;align-items:baseline}
+.cdx-hero h1 .cdx-kinetic-letters{display:inline-flex;white-space:nowrap}
+.cdx-hero h1 .cdx-kinetic-char{display:inline-block;flex:0 0 auto;white-space:pre}
 .cdx-kinetic-char{
   display:inline-block;
   transform-origin:50% 100%;
@@ -325,3 +327,28 @@
  .cdx-impact-word,.cdx-section-heading h2 em,.cdx-about-copy h2 em,.cdx-contact h2 em,.cdx-title-brand em{animation:none!important}
 }
 
+
+/* CROWNDEX VIDEO REEL — muted, viewport-aware previews for uploaded films */
+.cdx-poster-video.is-playing{opacity:1}
+.cdx-poster-button.is-previewing .cdx-poster-center,
+.cdx-poster-button.is-previewing .cdx-poster-disc,
+.cdx-poster-button.is-previewing .cdx-poster-ring,
+.cdx-poster-button.is-previewing .cdx-poster-streak{opacity:0;visibility:hidden;transition:opacity .35s ease,visibility .35s ease}
+.cdx-poster-button.is-previewing .cdx-poster-grid{opacity:.035}
+.cdx-video-status,.cdx-video-duration{position:absolute;z-index:12;display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid rgba(255,255,255,.16);border-radius:5px;background:rgba(7,8,14,.72);backdrop-filter:blur(14px);color:#f7f5ff;font:9px 'DM Mono',monospace;letter-spacing:.1em;pointer-events:none}
+.cdx-video-status{left:20px;bottom:18px}
+.cdx-video-status:before{content:"";width:6px;height:6px;border-radius:50%;background:#72e7d0;box-shadow:0 0 12px rgba(114,231,208,.75)}
+.cdx-video-duration{top:54px;right:20px;min-width:42px;justify-content:center}
+.cdx-poster-button:not(.is-previewing) .cdx-video-status{opacity:.75}
+.cdx-work-card .cdx-poster-video{background:#07080d}
+@media(max-width:720px){
+ .cdx-video-status{left:14px;bottom:14px;padding:7px 9px;font-size:8px}
+ .cdx-video-duration{right:14px;top:48px;padding:7px 9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .cdx-poster-video{display:none!important}
+ .cdx-poster-button.is-previewing .cdx-poster-center,
+ .cdx-poster-button.is-previewing .cdx-poster-disc,
+ .cdx-poster-button.is-previewing .cdx-poster-ring,
+ .cdx-poster-button.is-previewing .cdx-poster-streak{opacity:1;visibility:visible}
+}
