@@ -25,6 +25,7 @@ export type SiteSettings = {
   about_secondary: string;
   x_profile: string;
   telegram_url: string;
+  avatar_url: string;
 };
 
 export async function fetchLiveContent(): Promise<{
@@ -36,7 +37,7 @@ export async function fetchLiveContent(): Promise<{
   const [workResult, programResult, settingsResult] = await Promise.all([
     backend.from('portfolio_works').select('id,title,category,url,video_url,thumbnail,featured,published,sort_order').eq('published', true).order('sort_order', { ascending: true }),
     backend.from('creator_programs').select('id,name,role,description,url,logo_url,published,sort_order').eq('published', true).order('sort_order', { ascending: true }),
-    backend.from('site_settings').select('id,about_intro,about_secondary,x_profile,telegram_url').eq('id', 1).maybeSingle()
+    backend.from('site_settings').select('id,about_intro,about_secondary,x_profile,telegram_url,avatar_url').eq('id', 1).maybeSingle()
   ]);
   if (workResult.error) console.warn('CrownDEX: live portfolio unavailable; check Supabase setup.');
   if (programResult.error) console.warn('CrownDEX: creator programs unavailable; check Supabase setup.');

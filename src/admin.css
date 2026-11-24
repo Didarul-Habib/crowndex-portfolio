@@ -28,3 +28,21 @@ body:has(.admin-shell),body:has(.admin-login-shell){margin:0;background:#080912;
 @media(max-width:720px){.admin-sidebar{position:fixed;left:0;top:0;bottom:0;height:100svh;transform:translateX(-110%);transition:transform .25s ease;box-shadow:0 30px 70px #0008;width:min(290px,82vw)}.admin-sidebar.admin-sidebar-open{transform:translateX(0)}.admin-sidebar-close,.admin-mobile-toggle{display:grid}.admin-backdrop{position:fixed;z-index:90;inset:0;background:rgba(0,0,0,.68);border:0}.admin-topbar{height:64px;padding:0 18px}.admin-mobile-toggle{border:0;background:none}.admin-content{padding:24px 16px}.admin-heading{align-items:flex-start;flex-direction:column;gap:18px}.admin-heading h1{font-size:37px}.admin-heading-action{width:100%}.admin-stat-grid{grid-template-columns:1fr;gap:12px}.admin-stat,.admin-stat:last-child{min-height:152px;grid-column:auto}.admin-stat strong{margin:12px 0}.admin-stat strong.admin-stat-word{margin:15px 0}.admin-panel{padding:18px}.admin-list-row{display:grid;grid-template-columns:65px minmax(0,1fr) auto;gap:10px 12px}.admin-thumb{width:65px;flex-basis:65px;height:54px}.admin-list-copy{grid-column:2}.admin-status{grid-column:3;grid-row:1;align-self:center}.admin-row-actions{grid-column:1/-1;grid-row:2;justify-content:flex-end}.admin-list-head{display:block}.admin-list-head small{display:block;margin-top:10px}.admin-form-actions{justify-content:stretch}.admin-form-actions>button{flex:1}.admin-form-grid{gap:21px}.admin-preview-art{min-height:240px}.admin-source-tabs button{flex:1}.admin-quick-actions button{gap:11px}.admin-login-panel{padding:26px}}
 @media(max-width:400px){.admin-stat{min-height:141px}.admin-breadcrumb{font-size:9px}.admin-top-right>a{font-size:11px}.admin-row-actions button{width:35px;height:35px}}
 @media(prefers-reduced-motion:reduce){.admin-shell *, .admin-login-shell *{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Profile photo and resumable-upload feedback */
+
+.admin-upload-progress{position:relative;z-index:2;pointer-events:none;display:flex;align-items:center;gap:12px;width:100%;margin-top:12px}
+.admin-upload-progress>span{display:block;flex:1;height:5px;border-radius:20px;overflow:hidden;background:rgba(255,255,255,.12)}
+.admin-upload-progress>span>i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#b38aff,#76e6e8);transition:width .2s ease}
+.admin-upload-progress>small{min-width:42px;text-align:right;color:#d8caff;font:10px 'DM Mono',monospace}
+.admin-avatar-upload{display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;align-items:center}
+.admin-avatar-preview{width:110px;aspect-ratio:1;border-radius:50%;overflow:hidden;display:grid;place-items:center;border:1px solid rgba(192,159,255,.42);background:radial-gradient(circle at 35% 25%,rgba(164,126,255,.45),#11111a 70%);box-shadow:0 0 35px rgba(155,118,255,.13);color:#e8dcff;font-size:22px;font-weight:700}
+.admin-avatar-preview img{width:100%;height:100%;object-fit:cover}
+.admin-avatar-actions{display:grid;gap:10px;min-width:0}
+.admin-identity-preview .admin-preview-art{background-size:cover;background-position:center}
+.admin-identity-preview .admin-preview-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,8,14,.05),rgba(7,8,14,.75));pointer-events:none}
+.admin-identity-preview .admin-preview-art span{position:absolute;z-index:2;bottom:16px;left:16px}
+
+@media(max-width:720px){.admin-avatar-upload{grid-template-columns:84px minmax(0,1fr);gap:12px}.admin-avatar-preview{width:84px}}
+@media(max-width:420px){.admin-avatar-upload{grid-template-columns:1fr}.admin-avatar-preview{width:88px}}

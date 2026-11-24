@@ -65,6 +65,7 @@ create table if not exists public.site_settings (
   about_secondary text not null default '',
   x_profile text not null default 'https://x.com/_CrownDEX',
   telegram_url text not null default 'https://t.me/didarul_habib96',
+  avatar_url text not null default '',
   constraint one_settings_record check (id = 1)
 );
 
@@ -113,12 +114,12 @@ on conflict (id) do nothing;
 
 -- This bucket is PUBLIC-READ for videos/covers shown on the public portfolio,
 -- but only an approved administrator may upload, replace or delete files.
-insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+insert into storage.buckets as existing_bucket (id,name,public,file_size_limit,allowed_mime_types)
 values ('portfolio-media','portfolio-media',true,52428800,
   array['image/jpeg','image/png','image/webp','image/avif','video/mp4','video/webm'])
 on conflict (id) do update set
  public = excluded.public,
- file_size_limit = excluded.file_size_limit,
+ file_size_limit = greatest(existing_bucket.file_size_limit, excluded.file_size_limit),
  allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "CDX admins upload studio media" on storage.objects;
@@ -126,7 +127,7 @@ create policy "CDX admins upload studio media" on storage.objects
   for insert to authenticated with check (
     bucket_id = 'portfolio-media'
     and (select public.cdx_is_admin())
-    and split_part(name,'/',1) in ('works','programs')
+    and split_part(name,'/',1) in ('works','programs','profile')
   );
 
 drop policy if exists "CDX admins read media metadata" on storage.objects;

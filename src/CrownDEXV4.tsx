@@ -25,6 +25,7 @@ function scrollTo(id: string, reduced: boolean) { document.querySelector(id)?.sc
 
 type XWidgets = { widgets: { createTweet: (id: string, el: HTMLElement, options: Record<string, unknown>) => Promise<HTMLElement | null> } };
 let widgetPromise: Promise<XWidgets> | null = null;
+let activePreviewVideo: HTMLVideoElement | null = null;
 function getXWidgets(): Promise<XWidgets> {
   const host = window as Window & { twttr?: XWidgets };
   if (host.twttr?.widgets) return Promise.resolve(host.twttr);
@@ -121,40 +122,11 @@ function SignalField({ reduced }: { reduced: boolean }) {
   return <canvas className="cdx-signal-field" ref={canvasRef} aria-hidden="true" />;
 }
 
-function LightCursor({ reduced }: { reduced: boolean }) {
-  const halo = useRef<HTMLDivElement>(null);
-  const core = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (reduced || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    const h = halo.current; const c = core.current;
-    if (!h || !c) return;
-    let x = -400, y = -400, tx = -400, ty = -400, raf = 0;
-    const onMove = (e: PointerEvent) => {
-      tx = e.clientX; ty = e.clientY;
-      const target = e.target;
-      const interactive = target instanceof Element && Boolean(target.closest('a,button,[role="button"]'));
-      h.classList.toggle('cdx-pointer-active', interactive);
-      c.classList.toggle('cdx-pointer-active', interactive);
-      c.classList.toggle('cdx-pointer-card', target instanceof Element && Boolean(target.closest('.cdx-poster-button')));
-    };
-    const animate = () => {
-      x += (tx - x) * .13; y += (ty - y) * .13;
-      h.style.transform = `translate3d(${x}px,${y}px,0) translate(-50%,-50%)`;
-      c.style.transform = `translate3d(${tx}px,${ty}px,0) translate(-50%,-50%)`;
-      raf = requestAnimationFrame(animate);
-    };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    raf = requestAnimationFrame(animate);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('pointermove', onMove); };
-  }, [reduced]);
-  return <><div className="cdx-pointer-light" ref={halo} aria-hidden="true"/><div className="cdx-pointer-dot" ref={core} aria-hidden="true"/></>;
-}
-
-function useSectionChoreography(reduced: boolean) {
+function useSectionChoreography(reduced: boolean, contentVersion: number) {
   useEffect(() => {
     if (reduced || !('IntersectionObserver' in window)) return;
     const targets = Array.from(document.querySelectorAll<HTMLElement>(
-      '.cdx-section-heading, .cdx-about-copy, .cdx-about-art, .cdx-contact > h2, .cdx-story-step'
+      '.cdx-section-heading, .cdx-about-copy, .cdx-about-art, .cdx-contact > h2, .cdx-contact-buttons, .cdx-story-heading, .cdx-story-step, .cdx-service, .cdx-program-card'
     ));
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -166,7 +138,7 @@ function useSectionChoreography(reduced: boolean) {
     }, { threshold: .12 });
     targets.forEach(el => { el.classList.add('cdx-reveal'); observer.observe(el); });
     return () => { observer.disconnect(); targets.forEach(el => el.classList.remove('cdx-reveal')); };
-  }, [reduced]);
+  }, [reduced, contentVersion]);
 }
 
 function MotionLetters({ text }: { text: string }) {
@@ -179,15 +151,15 @@ function MotionLetters({ text }: { text: string }) {
   </span>;
 }
 
-function StudioIdentity() {
-  return <div className="cdx-identity-card" aria-label="CrownDEX studio identity">
+function StudioIdentity({ avatarUrl }: { avatarUrl?: string }) {
+  return <div className="cdx-identity-card" aria-label="CrownDEX creator profile">
     <div className="cdx-identity-orbit" />
     <div className="cdx-identity-grid" />
     <div className="cdx-identity-lens" />
-    <span className="cdx-identity-label">THE CREATOR BEHIND THE FILMS</span>
-    <div className="cdx-identity-mark">C<span>D</span><i>X</i></div>
-    <div className="cdx-identity-caption"><span>CREATIVE IDENTITY / CROWNDEX</span><strong>CRAFTING AI WORLDS. CREATING VISUAL IMPACT.</strong></div>
-    <span className="cdx-identity-corner">EST. IN IMAGINATION / ∞</span>
+    <span className="cdx-identity-label">THE CREATOR</span>
+    {avatarUrl ? <div className="cdx-identity-photo-shell"><img className="cdx-identity-photo" src={avatarUrl} alt="CrownDEX profile" loading="lazy" decoding="async"/></div> : <div className="cdx-identity-mark">C<span>D</span><i>X</i></div>}
+    <div className="cdx-identity-caption"><span>CROWNDEX / AI FILMMAKER</span><strong>STORY FIRST. FRAME OBSESSED.</strong></div>
+    <span className="cdx-identity-corner">VISUALS / MOTION / STORY</span>
   </div>;
 }
 
@@ -242,25 +214,32 @@ function WorkCard({ work, index, open, big = false }: { work: Work; index: numbe
     const playPreview = () => {
       if (wantsPlayback || document.visibilityState !== 'visible') return;
       wantsPlayback = true;
+      if (activePreviewVideo && activePreviewVideo !== video) activePreviewVideo.pause();
+      activePreviewVideo = video;
       video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
       const playback = video.play();
       if (playback) playback.then(() => setPreviewPlaying(true)).catch(() => {
         wantsPlayback = false;
+        if (activePreviewVideo === video) activePreviewVideo = null;
         setPreviewPlaying(false);
       });
     };
     const pausePreview = () => {
       wantsPlayback = false;
       video.pause();
+      video.preload = 'metadata';
+      if (activePreviewVideo === video) activePreviewVideo = null;
       setPreviewPlaying(false);
     };
 
     if (!('IntersectionObserver' in window)) return;
     const observer = new IntersectionObserver(entries => {
       const entry = entries[0];
-      if (entry?.isIntersecting && entry.intersectionRatio >= .55) playPreview();
+      if (entry?.isIntersecting && entry.intersectionRatio >= .32) playPreview();
       else pausePreview();
-    }, { threshold: [0, .55, .85] });
+    }, { threshold: [0, .32, .6] });
 
     observer.observe(card);
     const onVisibilityChange = () => {
@@ -269,7 +248,7 @@ function WorkCard({ work, index, open, big = false }: { work: Work; index: numbe
         return;
       }
       const rect = card.getBoundingClientRect();
-      if (rect.bottom > window.innerHeight * .15 && rect.top < window.innerHeight * .85) playPreview();
+      if (rect.bottom > window.innerHeight * .12 && rect.top < window.innerHeight * .88) playPreview();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -278,6 +257,7 @@ function WorkCard({ work, index, open, big = false }: { work: Work; index: numbe
       document.removeEventListener('visibilitychange', onVisibilityChange);
       wantsPlayback = false;
       video.pause();
+      if (activePreviewVideo === video) activePreviewVideo = null;
     };
   }, [work.video_url, reduced]);
 
@@ -294,15 +274,16 @@ function WorkCard({ work, index, open, big = false }: { work: Work; index: numbe
   const reset = () => { if (ref.current) { ref.current.style.setProperty('--tilt-x', '0deg'); ref.current.style.setProperty('--tilt-y', '0deg'); } };
   const openFilm = () => {
     videoRef.current?.pause();
+    if (videoRef.current && activePreviewVideo === videoRef.current) activePreviewVideo = null;
     setPreviewPlaying(false);
     open();
   };
 
-  return <motion.article className={`cdx-work-card ${big ? 'cdx-work-big' : ''}`} initial={{ opacity: 0, y: 44 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .13 }} transition={{ duration: .66 }}>
+  return <motion.article className={`cdx-work-card ${big ? 'cdx-work-big' : ''}`} initial={{ opacity: 0, y: 44, filter: 'blur(5px)' }} whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }} whileHover={{ y: -5 }} viewport={{ once: true, amount: .13 }} transition={{ duration: .66, ease: [.22, 1, .36, 1] }}>
     <div className="cdx-tilt" ref={ref} onMouseMove={tilt} onMouseLeave={reset}>
       <button className={`cdx-poster-button ${previewPlaying ? 'is-previewing' : ''}`} type="button" onClick={openFilm} aria-label={`Play ${titleFor(work, index)}`}>
         <Poster work={work} index={index}/>
-        {work.video_url && <video ref={videoRef} className={`cdx-poster-video ${previewPlaying ? 'is-playing' : ''}`} src={work.video_url} poster={work.thumbnail || undefined} muted playsInline loop preload="metadata" aria-hidden="true" onLoadedMetadata={event => setDuration(formatFilmDuration(event.currentTarget.duration))} onPlay={() => setPreviewPlaying(true)} onPause={() => setPreviewPlaying(false)} />}
+        {work.video_url && <video ref={videoRef} className={`cdx-poster-video ${previewPlaying ? 'is-playing' : ''}`} src={work.video_url} poster={work.thumbnail || undefined} muted playsInline loop preload="metadata" aria-hidden="true" onLoadedMetadata={event => setDuration(formatFilmDuration(event.currentTarget.duration))} onPlay={() => setPreviewPlaying(true)} onPause={() => { setPreviewPlaying(false); if (activePreviewVideo === videoRef.current) activePreviewVideo = null; }} />}
         {work.video_url && <><span className="cdx-video-status">{previewPlaying ? 'NOW PLAYING · MUTED' : 'VIDEO PREVIEW'}</span><span className="cdx-video-duration">{duration || 'FILM'}</span></>}
         <span className="cdx-card-shine" aria-hidden="true"/><span className="cdx-card-corner" aria-hidden="true">VIEW THE FILM ↗</span>
         <span className="cdx-poster-play"><Play fill="currentColor" size={19}/><span>{previewPlaying ? 'OPEN FILM' : 'PLAY FILM'}</span></span>
@@ -430,13 +411,13 @@ export default function CrownDEXV4() {
     return () => { cancelAnimationFrame(frame); lenis.destroy(); };
   }, [reduced]);
   useEffect(() => { document.body.classList.toggle('cdx-menu-open', menu); return () => document.body.classList.remove('cdx-menu-open'); }, [menu]);
-  useSectionChoreography(reduced);
+  useSectionChoreography(reduced, programs.length);
   return <div className="cdx-site">
-    <SignalField reduced={reduced}/><LightCursor reduced={reduced}/>
+    <SignalField reduced={reduced}/>
     <div className="cdx-aurora cdx-aurora-a" aria-hidden="true"/><div className="cdx-aurora cdx-aurora-b" aria-hidden="true"/>
     <motion.div className="cdx-progress" style={{ scaleX: progress }}/>
     <Intro reduced={reduced}/>
-    <header className="cdx-header"><a href="#home" className="cdx-logo" onClick={() => setMenu(false)}>CROWN<span>DEX</span><i/></a>
+    <header className="cdx-header"><a href="#home" className="cdx-logo" onClick={() => setMenu(false)}>{settings?.avatar_url && <img className="cdx-logo-avatar" src={settings.avatar_url} alt=""/>}CROWN<span>DEX</span><i/></a>
       <nav className="cdx-nav" aria-label="Main navigation">{nav.map(item => <a key={item.href} href={item.href}>{item.label}</a>)}</nav>
       <a href={telegramUrl} className="cdx-header-cta" target="_blank" rel="noopener noreferrer">LET'S TALK <ArrowUpRight size={15}/></a>
       <button className="cdx-menu-button" aria-expanded={menu} aria-label={menu ? 'Close menu' : 'Open menu'} onClick={() => setMenu(!menu)}>{menu ? <X/> : <Menu/>}</button>
@@ -445,28 +426,28 @@ export default function CrownDEXV4() {
     <main>
       <section className="cdx-hero cdx-v3-hero" id="home"><div className="cdx-hero-ghost" aria-hidden="true">C/D</div><div className="cdx-hero-grid"/><div className="cdx-hero-beam"/>
         <div className="cdx-hero-layout"><div className="cdx-hero-copy"><motion.div className="cdx-kicker" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .3 }}><i/> AI FILMMAKING / VISUAL STORYTELLING / CREATIVE DIRECTION</motion.div>
-          <div className="cdx-persona-line"><span className="cdx-persona-icon">CD<span>X</span></span><span>ORIGINAL SHORT FILMS / PRODUCT VISUALS<br/><strong>OPEN FOR CREATIVE COLLABORATIONS</strong></span><span className="cdx-persona-pulse"/></div>
+          <div className="cdx-persona-line"><span className="cdx-persona-icon">{settings?.avatar_url ? <img src={settings.avatar_url} alt="CrownDEX profile"/> : <>CD<span>X</span></>}</span><span>AI FILMS / PRODUCT VISUALS<br/><strong>OPEN TO SELECT COLLABORATIONS</strong></span><span className="cdx-persona-pulse"/></div>
           <h1 aria-label="CrownDEX. Stories in motion. Visuals that stay.">
             <motion.span className="cdx-title-brand" initial={{ opacity: 0, y: 70, filter: 'blur(12px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: .95, delay: .18 }}>CROWN<em>DEX</em></motion.span>
             <motion.span className="cdx-title-small" initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .9, delay: .38 }}><MotionLetters text="STORIES IN MOTION."/></motion.span>
             <motion.span className="cdx-title-outlined" initial={{ opacity: 0, y: 65 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .9, delay: .55 }}><MotionLetters text="VISUALS THAT "/><em className="cdx-impact-word"><MotionLetters text="STAY."/></em></motion.span>
           </h1>
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8 }}>Crafting AI worlds and creating visual impact through cinematic short films, striking product visuals, and story-led motion. Every frame begins with an idea.</motion.p>
+          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .8 }}>AI films, product visuals and original stories — shaped from first concept to final cut.</motion.p>
           <motion.div className="cdx-hero-buttons" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .94 }}><button className="cdx-button-main" onClick={() => scrollTo('#work', reduced)}>EXPLORE THE FILMS <ArrowUpRight size={17}/></button><a href={xProfileUrl} target="_blank" rel="noopener noreferrer" className="cdx-button-ghost">FIND ME ON X <ArrowRight size={16}/></a></motion.div>
           <div className="cdx-hero-stat"><span><b>{String(works.length).padStart(2, '0')}</b> SHOWCASED PROJECTS</span><span className="cdx-hero-stat-divider"/><span>01 CREATIVE VISION</span></div>
         </div><HeroArtwork onOpen={() => works.length && setActiveIndex(works.findIndex(w => w.id === (featured[0]?.id || works[0].id)))}/></div>
         <div className="cdx-hero-floor"><span>SCROLL TO ENTER THE STUDIO</span><ArrowDownRight size={18}/><span className="cdx-floor-right">© {new Date().getFullYear()} CROWNDEX / ALL ORIGINAL WORK</span></div>
       </section>
       <div className="cdx-marquee" aria-label="Creative disciplines"><div className="cdx-marquee-track">{Array.from({length: 2}).map((_,i) => <div className="cdx-marquee-group" key={i}>{['AI SHORT FILMS', 'PRODUCT ADVERTISEMENTS', 'CINEMATIC MOTION', 'CREATIVE DIRECTION', 'VISUAL WORLDS'].map(name => <span key={name}>{name}<b>✳</b></span>)}</div>)}</div></div>
-      <section className="cdx-section cdx-selected" id="selected"><div className="cdx-section-heading"><div><span className="cdx-overline">01 / THE SELECTED REEL</span><h2>Frames with <em>feeling.</em></h2></div><p>Explore the films in motion. Uploaded videos preview right here; original X posts remain one click away.</p></div><div className="cdx-selected-grid">{featured.map(w => <WorkCard key={w.id} work={w} index={works.indexOf(w)} big={w.id === featured[0]?.id} open={() => setActiveIndex(works.indexOf(w))}/>)}</div></section>
-      <section className="cdx-section cdx-all" id="work"><div className="cdx-section-heading"><div><span className="cdx-overline">02 / EVERY CREATION</span><h2>The moving <em>archive.</em></h2></div><p>Films play silently as they enter view. Open any project for the full video player and its original post.</p></div><div className="cdx-filter-bar" role="group" aria-label="Project categories">{categories.map(c => <button key={c} className={c === category ? 'cdx-filter-active' : ''} aria-pressed={c === category} onClick={() => setCategory(c)}>{c} <span>{c === 'All' ? works.length : works.filter(w => w.category === c).length}</span></button>)}</div><motion.div layout className="cdx-all-grid"><AnimatePresence mode="popLayout">{filtered.map(w => <motion.div key={w.id} layout initial={{ opacity: 0, scale: .94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .94 }} transition={{ duration: .3 }}><WorkCard work={w} index={works.indexOf(w)} open={() => setActiveIndex(works.indexOf(w))}/></motion.div>)}</AnimatePresence></motion.div></section>
+      <section className="cdx-section cdx-selected" id="selected"><div className="cdx-section-heading"><div><span className="cdx-overline">01 / THE SELECTED REEL</span><h2>Frames with <em>feeling.</em></h2></div><p>Original AI films, product visuals and visual experiments.</p></div><div className="cdx-selected-grid">{featured.map(w => <WorkCard key={w.id} work={w} index={works.indexOf(w)} big={w.id === featured[0]?.id} open={() => setActiveIndex(works.indexOf(w))}/>)}</div></section>
+      <section className="cdx-section cdx-all" id="work"><div className="cdx-section-heading"><div><span className="cdx-overline">02 / EVERY CREATION</span><h2>The moving <em>archive.</em></h2></div><p>A collection of original films and visual experiments.</p></div><div className="cdx-filter-bar" role="group" aria-label="Project categories">{categories.map(c => <button key={c} className={c === category ? 'cdx-filter-active' : ''} aria-pressed={c === category} onClick={() => setCategory(c)}>{c} <span>{c === 'All' ? works.length : works.filter(w => w.category === c).length}</span></button>)}</div><motion.div layout className="cdx-all-grid"><AnimatePresence mode="popLayout">{filtered.map(w => <motion.div key={w.id} layout initial={{ opacity: 0, scale: .94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .94 }} transition={{ duration: .3 }}><WorkCard work={w} index={works.indexOf(w)} open={() => setActiveIndex(works.indexOf(w))}/></motion.div>)}</AnimatePresence></motion.div></section>
       <section className="cdx-section cdx-about cdx-v3-about" id="studio">
-        <div className="cdx-about-art"><StudioIdentity/></div>
+        <div className="cdx-about-art"><StudioIdentity avatarUrl={settings?.avatar_url}/></div>
         <div className="cdx-about-copy">
           <span className="cdx-overline">03 / THE CREATOR BEHIND CROWNDEX</span>
           <h2>Behind every frame,<br/><em>a clear idea.</em></h2>
-          <p>{settings?.about_intro || "I’m CrownDEX, an independent AI filmmaker and visual storyteller. I create cinematic short films, original visual worlds, and product-focused stories that turn a strong concept into something people want to watch."}</p>
-          <p>{settings?.about_secondary || "For me, AI is a creative medium, not the whole story. I develop the idea, direct the visual language, and refine timing, movement, and sound until the final film feels intentional."}</p>
+          <p>{settings?.about_intro || "I’m CrownDEX, an independent AI filmmaker creating cinematic short films, original visual worlds and product visuals."}</p>
+          <p>{settings?.about_secondary || "I shape each project from concept and visual direction through motion, editing and the final cut."}</p>
           <div className="cdx-about-values">
             <div><span>THE FOCUS</span><strong>Story before spectacle</strong></div>
             <div><span>THE APPROACH</span><strong>Concept to final frame</strong></div>
@@ -478,7 +459,7 @@ export default function CrownDEXV4() {
       </section>
 
       {programs.length > 0 && <section className="cdx-section cdx-programs" id="programs" aria-label="Creator programs">
-        <div className="cdx-section-heading"><div><span className="cdx-overline">04 / CREATOR NETWORK</span><h2>Where ideas <em>connect.</em></h2></div><p>Creator programs and communities I participate in.</p></div>
+        <div className="cdx-section-heading"><div><span className="cdx-overline">04 / CREATOR NETWORK</span><h2>Where ideas <em>connect.</em></h2></div><p>Selected creator programs.</p></div>
         <div className="cdx-program-grid">{programs.map(program => <div key={program.id} className="cdx-program-card">
           <div className="cdx-program-identity">{program.logo_url ? <img src={program.logo_url} alt="" loading="lazy" /> : <span aria-hidden="true">✳</span>}</div>
           <div className="cdx-program-info"><span className="cdx-overline">{program.role || 'CREATOR PROGRAM'}</span><h3>{program.name}</h3>{program.description && <p>{program.description}</p>}</div>
@@ -493,8 +474,8 @@ export default function CrownDEXV4() {
           <div className="cdx-story-step"><span>03 / REFINE</span><strong>THE FILM.</strong><p>Shape the edit and sound around the story.</p></div>
         </div>
       </section>
-      <section className="cdx-section cdx-services" id="services"><div className="cdx-section-heading"><div><span className="cdx-overline">05 / WHAT I BRING TO LIFE</span><h2>Built to <em>stand out.</em></h2></div><p>From the first wild idea to the final cinematic frame.</p></div><div className="cdx-service-grid">{[['01','AI PRODUCT CAMPAIGNS','Product-focused visuals and short advertisements designed to make an impression.'],['02','CINEMATIC SHORT FILMS','Character, atmosphere and storytelling translated into expressive AI videos.'],['03','BRAND STORYTELLING','Ideas shaped around brand personality, tone, and visual identity.'],['04','CONCEPT → FINAL CUT','Concept development, visual direction and creative refinement.']].map(([n, t, d]) => <motion.div key={n} whileHover={{ y: -7 }} className="cdx-service"><div><span>{n} /</span><MoveUpRight size={22}/></div><h3>{t}</h3><p>{d}</p></motion.div>)}</div></section>
-      <section className="cdx-contact" id="contact"><div className="cdx-contact-glow"/><span className="cdx-overline">06 / LET’S MAKE SOMETHING</span><h2>HAVE A STORY?<br/><em>LET’S GIVE IT MOTION.</em></h2><p>From the first spark of an idea to the final cinematic frame.</p><div className="cdx-contact-buttons"><a className="cdx-button-main" href={telegramUrl} target="_blank" rel="noopener noreferrer">START A CONVERSATION <ArrowUpRight size={18}/></a><a className="cdx-button-ghost" href={xProfileUrl} target="_blank" rel="noopener noreferrer">CONNECT ON X <ArrowRight size={16}/></a></div><div className="cdx-contact-stamp">CROWNDEX <Check size={17}/> READY FOR YOUR NEXT BRIEF</div></section>
+      <section className="cdx-section cdx-services" id="services"><div className="cdx-section-heading"><div><span className="cdx-overline">05 / WHAT I BRING TO LIFE</span><h2>Built to <em>stand out.</em></h2></div><p>Concept to final frame.</p></div><div className="cdx-service-grid">{[['01','AI PRODUCT CAMPAIGNS','Product-focused visuals and short advertisements designed to make an impression.'],['02','CINEMATIC SHORT FILMS','Character, atmosphere and storytelling translated into expressive AI videos.'],['03','BRAND STORYTELLING','Ideas shaped around brand personality, tone, and visual identity.'],['04','CONCEPT → FINAL CUT','Concept development, visual direction and creative refinement.']].map(([n, t, d]) => <motion.div key={n} whileHover={{ y: -7 }} className="cdx-service"><div><span>{n} /</span><MoveUpRight size={22}/></div><h3>{t}</h3><p>{d}</p></motion.div>)}</div></section>
+      <section className="cdx-contact" id="contact"><div className="cdx-contact-glow"/><span className="cdx-overline">06 / LET’S MAKE SOMETHING</span><h2>HAVE A STORY?<br/><em>LET’S GIVE IT MOTION.</em></h2><p>Let's turn the next idea into a film.</p><div className="cdx-contact-buttons"><a className="cdx-button-main" href={telegramUrl} target="_blank" rel="noopener noreferrer">START A CONVERSATION <ArrowUpRight size={18}/></a><a className="cdx-button-ghost" href={xProfileUrl} target="_blank" rel="noopener noreferrer">CONNECT ON X <ArrowRight size={16}/></a></div><div className="cdx-contact-stamp">CROWNDEX <Check size={17}/> READY FOR YOUR NEXT BRIEF</div></section>
     </main>
     <footer className="cdx-footer"><a href="#home" className="cdx-logo">CROWN<span>DEX</span><i/></a><span>© {new Date().getFullYear()} CROWNDEX / INDEPENDENT AI CREATOR</span><div><a href={xProfileUrl} target="_blank" rel="noopener noreferrer">X <ArrowUpRight size={14}/></a><a href={telegramUrl} target="_blank" rel="noopener noreferrer">TELEGRAM <ArrowUpRight size={14}/></a><a href="#home">BACK TO TOP ↑</a><a href="/admin" aria-label="Studio admin sign in">STUDIO LOGIN</a></div></footer>
     <AnimatePresence>{activeIndex !== null && works[activeIndex] && <FilmViewer key={works[activeIndex].id} work={works[activeIndex]} allWorks={works} onClose={close} onPrev={prev} onNext={next}/>}</AnimatePresence>
