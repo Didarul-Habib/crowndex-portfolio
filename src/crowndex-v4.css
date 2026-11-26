@@ -4253,3 +4253,16 @@ html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-orbit svg { an
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -9px; }
 }
+
+/* Category-specific Services media preview; uses existing media and never substitutes the hero film. */
+.cdx-service-preview > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 280ms ease; pointer-events: none; }
+.cdx-service-preview.is-video-playing > video { opacity: .85; }
+.cdx-service-preview.is-video-playing > img { opacity: .08; }
+.cdx-service-preview-caption { pointer-events: none; }
+.cdx-service-preview-caption .cdx-service-preview-action { pointer-events: auto; margin-top: 10px; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(9,10,20,.84); color: #f8f6ff; font: 600 11px var(--cdx-font-body); cursor: pointer; transition: transform 200ms ease, border-color 200ms ease; }
+.cdx-service-preview-action:hover, .cdx-service-preview-action:focus-visible { transform: translateY(-2px); border-color: var(--cdx-gold); }
+.cdx-service-preview-action:focus-visible { outline: 2px solid var(--cdx-gold); outline-offset: 2px; }
+.cdx-service-preview-empty { color: #d2cadd; font-size: 12px; line-height: 1.6; }
+@media (prefers-reduced-motion: reduce) {
+  .cdx-service-preview > video, .cdx-service-preview > img { transition: none; }
+}

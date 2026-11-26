@@ -109,11 +109,15 @@ function dateFromXId(url: string) {
 }
 
 function categoryLabel(work: Work, saved?: Partial<ProjectMeta>) {
-  const liveCategory = (work.category || '').toLowerCase();
-  const hasSpecificLiveCategory = /funny|comedy|product|advert|(^|\s)ad($|\s)/.test(liveCategory);
-  const value = (hasSpecificLiveCategory ? work.category : saved?.category || work.category || '').toLowerCase();
-  if (value.includes('funny') || value.includes('comedy')) return 'Funny Short';
-  if (value.includes('product') || value.includes('advert') || /(^|\s)ad($|\s)/.test(value)) return 'Product Ad';
+  const live = (work.category || '').trim();
+  // Preserve specific Supabase admin categories, but allow rich metadata to refine generic legacy records.
+  const isGeneric = !live || /^(ai creations?)$/i.test(live);
+  const value = (isGeneric ? saved?.category || live : live).toLowerCase();
+  if (/meme/.test(value)) return 'Meme';
+  if (/short stor(y|ies)|storytelling|narrative/.test(value)) return 'Short Story';
+  if (/funny|comedy|humou?r/.test(value)) return 'Funny Short';
+  if (/product|advert|\bads?\b/.test(value)) return 'Product Ad';
+  if (/visual direction|art direction/.test(value)) return 'Visual Direction';
   return 'AI Film';
 }
 
@@ -1140,6 +1144,67 @@ function FpsCounter({ enabled }: { enabled: boolean }) {
   return <div className="cdx-fps-counter" aria-live="off">{fps || '--'} FPS</div>;
 }
 
+/** Only the hovered/focused category plays. Never substitute an unrelated film. */
+function ServiceCategoryPreview({ row, service, active, reduced, fallbackEyebrow, fallbackTitle, previewLabel, onOpen }: {
+  row: { work: Work; project: ProjectMeta } | null;
+  service: { number: string; title: string };
+  active: boolean;
+  reduced: boolean;
+  fallbackEyebrow: string;
+  fallbackTitle: string;
+  previewLabel: string;
+  onOpen: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const source = row?.project.previewVideo || row?.project.videoUrl || '';
+  const poster = row?.project.thumbnail || '';
+
+  useEffect(() => {
+    const video = videoRef.current;
+    setPlaying(false);
+    setVideoFailed(false);
+    if (!video || !active || reduced || !source) {
+      pauseManagedVideo(video);
+      return;
+    }
+    const start = () => {
+      if (document.hidden || !video.isConnected || !video.paused) return;
+      pauseAllManagedVideos();
+      void playManagedVideo(video).catch(() => setPlaying(false));
+    };
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) start();
+      else pauseManagedVideo(video);
+    }, { threshold: .25 });
+    if (containerRef.current) observer.observe(containerRef.current);
+    const onVisibility = () => {
+      if (document.hidden) pauseManagedVideo(video);
+      else if (containerRef.current && containerRef.current.getBoundingClientRect().bottom > 0 && containerRef.current.getBoundingClientRect().top < window.innerHeight) start();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+      pauseManagedVideo(video);
+    };
+  }, [row?.work.id, source, active, reduced]);
+
+  return <div ref={containerRef} className={`cdx-service-preview${playing ? ' is-video-playing' : ''}`} aria-live="polite">
+    {poster ? <img src={poster} alt={`Poster for ${row?.work.title || service.title}`} loading="lazy" decoding="async" width={1280} height={720}/> :
+      <div className="cdx-service-preview-art"><span>{fallbackEyebrow}</span><strong>{row ? service.title : fallbackTitle}</strong></div>}
+    {row && source && !videoFailed && !reduced && <video key={row.work.id} ref={videoRef} src={active ? source : undefined} poster={poster || undefined} muted loop playsInline preload="none"
+      aria-label={`${service.title} video preview`} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} onError={() => { setPlaying(false); setVideoFailed(true); }}/>}
+    <div className="cdx-service-preview-caption">
+      <span>{previewLabel} / {service.number}</span><strong>{service.title}</strong>
+      {row ? <button type="button" className="cdx-service-preview-action" onClick={onOpen}>View project <ArrowUpRight size={14}/></button> :
+        <small className="cdx-service-preview-empty">No published video in this category yet.</small>}
+    </div>
+  </div>;
+}
+
 const CROWNDEX_THEMES = [
   { id: 'gold', label: 'Gold', accent: '#E8B04B' },
   { id: 'crimson', label: 'Crimson', accent: '#FF2E3D' },
@@ -1222,6 +1287,7 @@ export default function CrownDEXV4() {
   const [sort, setSort] = useState<'newest' | 'views' | 'likes'>('newest');
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [activeService, setActiveService] = useState(0);
+  const [servicePreviewActive, setServicePreviewActive] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const xProfileUrl = settings?.x_profile || xProfile;
   const telegramUrl = settings?.telegram_url || telegram;
@@ -1238,6 +1304,9 @@ export default function CrownDEXV4() {
     { value: 'AI Film', label: siteContent.filterAi },
     { value: 'Funny Short', label: siteContent.filterFunny },
     { value: 'Product Ad', label: siteContent.filterAds },
+    { value: 'Meme', label: 'Memes' },
+    { value: 'Short Story', label: 'Short Stories' },
+    { value: 'Visual Direction', label: 'Visual Direction' },
   ];
 
   const projectRows = useMemo(() => works.map(work => ({ work, project: projectFor(work) })), [works]);
@@ -1350,11 +1419,27 @@ export default function CrownDEXV4() {
   // The large About heading already introduces the creator; avoid repeating the same phrase in the paragraph.
   const aboutIntro = storedIntro.replace(/^\s*I[’']m\s+CrownDEX,\s*/i, '');
   const aboutSecondary = settings?.about_secondary?.trim() || 'My work combines creative direction, AI video generation, editing and sound. I enjoy building cinematic stories, playful moments and product-focused visuals, shaping each piece from its first idea through the final cut.';
+  // The original three service titles/descriptions remain editable in Admin Studio.
   const services = [
-    { number: '01', title: siteContent.serviceOneTitle, description: siteContent.serviceOneDescription },
-    { number: '02', title: siteContent.serviceTwoTitle, description: siteContent.serviceTwoDescription },
-    { number: '03', title: siteContent.serviceThreeTitle, description: siteContent.serviceThreeDescription },
+    { number: '01', kind: 'film', title: siteContent.serviceOneTitle, description: siteContent.serviceOneDescription },
+    { number: '02', kind: 'product', title: siteContent.serviceTwoTitle, description: siteContent.serviceTwoDescription },
+    { number: '03', kind: 'meme', title: 'Memes', description: 'Short, playful edits and meme-style moments made to be shared.' },
+    { number: '04', kind: 'story', title: 'Short stories', description: 'Compact stories with characters, emotion and a clear beginning-to-end arc.' },
+    { number: '05', kind: 'direction', title: siteContent.serviceThreeTitle, description: siteContent.serviceThreeDescription },
   ];
+  const activeServiceItem = services[activeService] || services[0];
+  const matchingServiceRows = projectRows.filter(({ project }) => {
+    switch (activeServiceItem.kind) {
+      case 'product': return project.category === 'Product Ad';
+      case 'meme': return project.category === 'Meme' || project.category === 'Funny Short';
+      case 'story': return project.category === 'Short Story';
+      case 'direction': return project.category === 'Visual Direction';
+      default: return project.category === 'AI Film';
+    }
+  });
+  const activeServiceRow = matchingServiceRows.find(row => Boolean(row.project.videoUrl || row.project.previewVideo))
+    || matchingServiceRows.find(row => Boolean(row.project.thumbnail))
+    || matchingServiceRows[0] || null;
 
   return (
     <div className="cdx-site">
@@ -1474,14 +1559,18 @@ export default function CrownDEXV4() {
         <section className="cdx-section cdx-services" id="services">
           <div className="cdx-container">
             <div className="cdx-section-heading"><div><span className="cdx-eyebrow">{siteContent.servicesEyebrow}</span><h2><span className="cdx-heading-word">{siteContent.servicesTitleLead}</span> <em className="cdx-heading-word">{siteContent.servicesTitleAccent}</em></h2></div><p className="cdx-reveal-copy">{siteContent.servicesDescription}</p></div>
-            <div className="cdx-services-layout">
+            <div className="cdx-services-layout" onMouseLeave={() => setServicePreviewActive(false)}
+              onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setServicePreviewActive(false); }}>
               <div className="cdx-service-accordion">
-                {services.map((service, index) => <button key={service.number} type="button" className={`cdx-service-row ${activeService === index ? 'is-active' : ''}`} aria-expanded={activeService === index} onClick={() => setActiveService(index)} onMouseEnter={() => setActiveService(index)} data-cursor="VIEW"><span className="cdx-service-number">{service.number}</span><span className="cdx-service-row-copy"><strong>{service.title}</strong><span className="cdx-service-description">{activeService === index ? service.description : siteContent.serviceExploreLabel}</span></span><ArrowUpRight size={20} /></button>)}
+                {services.map((service, index) => <button key={service.number} type="button" className={`cdx-service-row ${activeService === index ? 'is-active' : ''}`} aria-expanded={activeService === index}
+                  onClick={() => { setActiveService(index); setServicePreviewActive(true); }}
+                  onMouseEnter={() => { setActiveService(index); setServicePreviewActive(true); }}
+                  onFocus={() => { setActiveService(index); setServicePreviewActive(true); }}
+                  data-cursor="VIEW"><span className="cdx-service-number">{service.number}</span><span className="cdx-service-row-copy"><strong>{service.title}</strong><span className="cdx-service-description">{activeService === index ? service.description : siteContent.serviceExploreLabel}</span></span><ArrowUpRight size={20} /></button>)}
               </div>
-              <div className="cdx-service-preview" aria-live="polite">
-                {showreelRow?.project.thumbnail ? <img src={showreelRow.project.thumbnail} alt="Selected CrownDEX project frame" loading="lazy" decoding="async" width={1280} height={720} /> : <div className="cdx-service-preview-art"><span>{siteContent.servicePreviewFallbackEyebrow}</span><strong>{siteContent.servicePreviewFallbackTitle}</strong></div>}
-                <div><span>{siteContent.servicePreviewLabel} / {services[activeService].number}</span><strong>{services[activeService].title}</strong></div>
-              </div>
+              <ServiceCategoryPreview row={activeServiceRow} service={activeServiceItem} active={servicePreviewActive} reduced={reduced}
+                fallbackEyebrow={siteContent.servicePreviewFallbackEyebrow} fallbackTitle="COMING SOON"
+                previewLabel={siteContent.servicePreviewLabel} onOpen={() => openWork(activeServiceRow?.work)} />
             </div>
           </div>
         </section>

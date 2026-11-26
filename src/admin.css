@@ -88,3 +88,8 @@ body:has(.admin-shell),body:has(.admin-login-shell){margin:0;background:#080912;
 .admin-site-content-form .admin-form-actions .admin-action{min-width:205px}
 @media(max-width:800px){.admin-content-toolbar{align-items:flex-start;flex-direction:column}.admin-preview-site{width:100%;justify-content:center}.admin-content-fields,.admin-content-media-grid{grid-template-columns:1fr}.admin-content-field-wide{grid-column:auto}}
 @media(max-width:520px){.admin-content-group>summary{align-items:flex-start;padding:16px}.admin-content-count{display:none}.admin-content-fields{padding:0 16px 18px}.admin-content-media-panel{padding:17px}.admin-site-content-form .admin-form-actions{position:static;flex-direction:column-reverse}.admin-site-content-form .admin-form-actions>button{width:100%}}
+
+/* Native category picker: show every option reliably on desktop/mobile. */
+.admin-fields select { width: 100%; min-height: 48px; border: 1px solid rgba(255,255,255,.17); border-radius: 10px; background: #090a14; color: #f7f3ff; padding: 12px 14px; font-size: 13px; font-family: inherit; color-scheme: dark; cursor: pointer; }
+.admin-fields select:focus-visible { outline: 2px solid #b49aff; outline-offset: 2px; }
+.admin-fields select option { background: #11121c; color: #f7f3ff; }
