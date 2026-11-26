@@ -1,0 +1,67 @@
+{
+  "crowndex-work-01": {
+    "views": 58360,
+    "likes": 193,
+    "comments": 103,
+    "reposts": null,
+    "bookmarks": 1,
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2117452447421788160/img/B8pGPXvAVF-XM26X.jpg",
+    "previewVideo": "https://video.twimg.com/amplify_video/2117452447421788160/vid/avc1/320x568/sioTtsKsxp1IT7QW.mp4?tag=29",
+    "videoUrl": "https://video.twimg.com/amplify_video/2117452447421788160/vid/avc1/320x568/sioTtsKsxp1IT7QW.mp4?tag=29",
+    "duration": "0:15",
+    "fetchedAt": "2026-11-26T03:49:35.043Z",
+    "source": "FxTwitter public post snapshot (unofficial)"
+  },
+  "crowndex-work-02": {
+    "views": 62041,
+    "likes": 272,
+    "comments": 131,
+    "reposts": null,
+    "bookmarks": 0,
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2120754912359530496/img/nzVqfboFrm8LfyX0.jpg",
+    "previewVideo": "https://video.twimg.com/amplify_video/2120754912359530496/vid/avc1/480x270/c3sUr6MMyLv0bm0C.mp4?tag=29",
+    "videoUrl": "https://video.twimg.com/amplify_video/2120754912359530496/vid/avc1/480x270/c3sUr6MMyLv0bm0C.mp4?tag=29",
+    "duration": "0:30",
+    "fetchedAt": "2026-11-26T03:49:35.097Z",
+    "source": "FxTwitter public post snapshot (unofficial)"
+  },
+  "crowndex-work-03": {
+    "views": 51591,
+    "likes": 249,
+    "comments": 157,
+    "reposts": null,
+    "bookmarks": 19,
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2121125038812532736/img/TLRz6Bl_EVV2Ka1G.jpg",
+    "previewVideo": "https://video.twimg.com/amplify_video/2121125038812532736/vid/avc1/474x270/h22XODaCGAmegILq.mp4?tag=29",
+    "videoUrl": "https://video.twimg.com/amplify_video/2121125038812532736/vid/avc1/474x270/h22XODaCGAmegILq.mp4?tag=29",
+    "duration": "0:30",
+    "fetchedAt": "2026-11-26T03:49:35.045Z",
+    "source": "FxTwitter public post snapshot (unofficial)"
+  },
+  "crowndex-work-04": {
+    "views": 54899,
+    "likes": 241,
+    "comments": 111,
+    "reposts": null,
+    "bookmarks": 4,
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2122019156921106432/img/8_icwvsKmFOdxY5O.jpg",
+    "previewVideo": "https://video.twimg.com/amplify_video/2122019156921106432/vid/avc1/474x270/d1Bha4BPIe3VcS8Y.mp4?tag=29",
+    "videoUrl": "https://video.twimg.com/amplify_video/2122019156921106432/vid/avc1/474x270/d1Bha4BPIe3VcS8Y.mp4?tag=29",
+    "duration": "0:30",
+    "fetchedAt": "2026-11-26T03:49:35.098Z",
+    "source": "FxTwitter public post snapshot (unofficial)"
+  },
+  "crowndex-work-05": {
+    "views": 53115,
+    "likes": 464,
+    "comments": 232,
+    "reposts": null,
+    "bookmarks": 3,
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2122750517126582272/img/YpZodteFQ6zjj6go.jpg",
+    "previewVideo": "https://video.twimg.com/amplify_video/2122750517126582272/vid/avc1/474x270/279TCVDM3PtP0ivp.mp4?tag=29",
+    "videoUrl": "https://video.twimg.com/amplify_video/2122750517126582272/vid/avc1/474x270/279TCVDM3PtP0ivp.mp4?tag=29",
+    "duration": "1:00",
+    "fetchedAt": "2026-11-26T03:49:35.097Z",
+    "source": "FxTwitter public post snapshot (unofficial)"
+  }
+}
