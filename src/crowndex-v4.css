@@ -4266,3 +4266,11 @@ html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-orbit svg { an
 @media (prefers-reduced-motion: reduce) {
   .cdx-service-preview > video, .cdx-service-preview > img { transition: none; }
 }
+
+/* Contact typography refinement (2026-11-26): the second CMS headline
+   phrase is intentionally smaller than the lead, without changing CMS copy. */
+.cdx-site .cdx-contact-copy h2 > em.cdx-heading-word {
+  font-size: 0.70em;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+}
