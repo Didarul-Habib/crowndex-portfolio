@@ -783,12 +783,67 @@ function Timecode({ reduced }: { reduced: boolean }) {
   return <span ref={ref}>{[hours, minutes, seconds, frame].map(value => String(value).padStart(2, '0')).join(':')}</span>;
 }
 
-function HeroShowreel({ work, project, reduced, onOpen, posterOverride, chipOne, chipTwo, ratioLabel, recLabel, captionLabel, fallbackTitle }: { work?: Work; project?: ProjectMeta; reduced: boolean; onOpen: () => void; posterOverride: string; chipOne: string; chipTwo: string; ratioLabel: string; recLabel: string; captionLabel: string; fallbackTitle: string }) {
+function HeroShowreel({ work, project, reduced, onOpen, filmEndedSignal, posterOverride, chipOne, chipTwo, ratioLabel, recLabel, captionLabel, fallbackTitle }: { work?: Work; project?: ProjectMeta; reduced: boolean; onOpen: () => void; filmEndedSignal: number; posterOverride: string; chipOne: string; chipTwo: string; ratioLabel: string; recLabel: string; captionLabel: string; fallbackTitle: string }) {
   const [videoFailed, setVideoFailed] = useState(false);
+  const [videoEnded, setVideoEnded] = useState(false);
+  // The theatre starts fully closed, opens once on mount, and closes again
+  // only after the one-shot hero reel reaches its natural end.
+  const [curtainState, setCurtainState] = useState<'closed' | 'opening' | 'open' | 'closing'>('closed');
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoUrl = project?.videoUrl || work?.video_url;
-  useEffect(() => setVideoFailed(false), [videoUrl]);
+
+  // Video metadata can arrive after the hero mounts. Keep source recovery
+  // separate from the theatre sequence so a URL refresh never restarts the
+  // curtains or causes a visible open-close-open twitch.
+  useEffect(() => {
+    setVideoFailed(false);
+  }, [videoUrl]);
+
+  // Run the opening sequence independently of video loading. The state begins
+  // closed on the first render, waits for the stage to settle, then opens once.
+  useEffect(() => {
+    setCurtainState('closed');
+
+    if (reduced) {
+      setCurtainState('open');
+      return;
+    }
+
+    const openDelay = 1200;
+    const revealDuration = 6400;
+    const openStart = window.setTimeout(() => setCurtainState('opening'), openDelay);
+    const openDone = window.setTimeout(
+      () => setCurtainState('open'),
+      openDelay + revealDuration + 120
+    );
+
+    return () => {
+      window.clearTimeout(openStart);
+      window.clearTimeout(openDone);
+    };
+  }, [reduced]);
+
+  useEffect(() => {
+    if (filmEndedSignal > 0) setVideoEnded(true);
+  }, [filmEndedSignal]);
+
+  useEffect(() => {
+    if (curtainState === 'open' && videoEnded) {
+      setCurtainState('closing');
+      return;
+    }
+
+    if (curtainState !== 'closing') return;
+
+    const closeDone = window.setTimeout(
+      () => setCurtainState('closed'),
+      reduced ? 0 : 3800
+    );
+
+    return () => window.clearTimeout(closeDone);
+  }, [curtainState, videoEnded, reduced]);
+
   useEffect(() => {
     const container = containerRef.current;
     const video = videoRef.current;
@@ -814,27 +869,51 @@ function HeroShowreel({ work, project, reduced, onOpen, posterOverride, chipOne,
       pauseManagedVideo(video);
     };
   }, [videoUrl, videoFailed, reduced]);
+
+  const displayPoster = posterOverride || project?.thumbnail || '';
+  const displayCaption = captionLabel || 'GRAND UNFOLDING';
+  const displayFallback = fallbackTitle || 'Stories in motion.';
+  const displayTitle = work && project ? titleFor(work, 0, project) : displayFallback;
+  const displayChipOne = chipOne || 'LIVING POSTER';
+  const displayChipTwo = chipTwo || 'PORTAL STAGE';
+  const displayRatio = ratioLabel || '16:9 · WIDESCREEN';
+  const displayRec = recLabel || 'REC';
+
   return (
-    <div ref={containerRef} className="cdx-showreel" aria-label="CrownDEX showreel" data-cursor="PLAY">
+    <div ref={containerRef} className={`cdx-showreel cdx-showreel--unfold is-${curtainState}`} data-curtain-state={curtainState} data-video-ended={videoEnded ? 'true' : 'false'} aria-label="CrownDEX 16:9 widescreen showreel" data-cursor="PLAY">
+      <div className="cdx-showreel-stage-lights" aria-hidden="true">
+        <span className="cdx-showreel-stage-light cdx-showreel-stage-light--one" />
+        <span className="cdx-showreel-stage-light cdx-showreel-stage-light--two" />
+        <span className="cdx-showreel-stage-light cdx-showreel-stage-light--three" />
+      </div>
+      <div className="cdx-showreel-rings" aria-hidden="true">
+        <span className="cdx-showreel-ring cdx-showreel-ring--outer" />
+        <span className="cdx-showreel-ring cdx-showreel-ring--inner" />
+      </div>
       {videoUrl && !videoFailed ? (
-        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={posterOverride || project?.thumbnail || undefined} muted loop playsInline preload="metadata" onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
-      ) : (posterOverride || project?.thumbnail) ? (
-        <img className="cdx-showreel-poster" src={posterOverride || project?.thumbnail || ''} alt={`${work && project ? titleFor(work, 0, project) : 'CrownDEX showreel'} poster`} fetchPriority="high" decoding="async" width={1280} height={720} />
+        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onEnded={() => { pauseManagedVideo(videoRef.current); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
+      ) : displayPoster ? (
+        <img className="cdx-showreel-poster" src={displayPoster} alt={`${work && project ? titleFor(work, 0, project) : 'CrownDEX showreel'} poster`} fetchPriority="high" decoding="async" width={1280} height={720} />
       ) : (
-        <div className="cdx-showreel-fallback"><Film size={36} strokeWidth={1.2} /><span>{captionLabel}</span><strong>{fallbackTitle}</strong></div>
+        <div className="cdx-showreel-fallback"><Film size={36} strokeWidth={1.2} /><span>{displayCaption}</span><strong>{displayFallback}</strong></div>
       )}
       <div className="cdx-showreel-shade" />
       <div className="cdx-viewfinder" aria-hidden="true"><i /><i /><i /><i /></div>
-      <div className="cdx-showreel-rec"><i /> {recLabel} <Timecode reduced={reduced} /></div>
-      <span className="cdx-showreel-chip cdx-chip-one">{chipOne}</span>
-      <span className="cdx-showreel-chip cdx-chip-two">{chipTwo}</span>
-      <div className="cdx-showreel-caption"><span>{captionLabel}</span><strong>{work && project ? titleFor(work, 0, project) : fallbackTitle}</strong></div>
-      {work && <button className="cdx-showreel-play cdx-magnetic" type="button" onClick={onOpen} aria-label={`Open ${titleFor(work, 0, project)}`}><Play size={17} fill="currentColor" /><span>OPEN FILM</span></button>}
-      <span className="cdx-showreel-ratio">{ratioLabel}</span>
+      <div className="cdx-showreel-curtains" aria-hidden="true">
+        <span className="cdx-showreel-curtain cdx-showreel-curtain--left"><i /><i /><i /><i /><i /></span>
+        <span className="cdx-showreel-curtain cdx-showreel-curtain--right"><i /><i /><i /><i /><i /></span>
+      </div>
+      <div className="cdx-showreel-rec"><i /> {displayRec} <Timecode reduced={reduced} /></div>
+      <span className="cdx-showreel-chip cdx-chip-one">{displayChipOne}</span>
+      <span className="cdx-showreel-chip cdx-chip-two">{displayChipTwo}</span>
+      <div className="cdx-showreel-caption"><span>{displayCaption}</span><strong>{displayTitle}</strong></div>
+      {work && <button className="cdx-showreel-play cdx-magnetic" type="button" onClick={onOpen} aria-label={`${videoEnded ? 'Replay' : 'Open'} ${titleFor(work, 0, project)}`}><Play size={17} fill="currentColor" /><span>{videoEnded ? 'REPLAY FILM' : 'OPEN FILM'}</span></button>}
+      <span className="cdx-showreel-ratio">{displayRatio}</span>
       <div className="cdx-showreel-progress" aria-hidden="true"><span /></div>
     </div>
   );
 }
+
 
 function WorkCard({ work, project, index, open, reduced, featuredLayout = false }: {
   work: Work;
@@ -969,6 +1048,7 @@ function FilmViewer({
   onClose,
   onPrev,
   onNext,
+  onVideoEnded,
 }: {
   work: Work;
   project: ProjectMeta;
@@ -976,6 +1056,7 @@ function FilmViewer({
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
+  onVideoEnded?: () => void;
 }) {
   const embedRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -1037,7 +1118,7 @@ function FilmViewer({
         </div>
         <div className="cdx-film-content">
           <motion.div layoutId={`cdx-film-frame-${work.id}`} transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }} className="cdx-film-stage">
-            {videoUrl && !localVideoFailed && <video key={videoUrl} className="cdx-native-video" src={videoUrl} controls playsInline preload="metadata" autoPlay poster={project.thumbnail || undefined} onError={() => setLocalVideoFailed(true)} />}
+            {videoUrl && !localVideoFailed && <video key={videoUrl} className="cdx-native-video" src={videoUrl} controls playsInline preload="metadata" autoPlay poster={project.thumbnail || undefined} onEnded={onVideoEnded} onError={() => setLocalVideoFailed(true)} />}
             {!videoUrl && <div ref={embedRef} className="cdx-x-frame" />}
             {state === 'loading' && !videoUrl && <div className="cdx-film-message"><span className="cdx-spinner" />Opening the original X player…</div>}
             {(state === 'failed' || localVideoFailed) && <div className="cdx-film-fallback"><Film size={32} /><h4>Open the original film</h4><p>The embedded player is unavailable here. You can still watch the original post.</p><a href={project.xUrl || work.url} target="_blank" rel="noopener noreferrer">OPEN VIDEO <ExternalLink size={15} /></a></div>}
@@ -1286,6 +1367,7 @@ export default function CrownDEXV4() {
   const [category, setCategory] = useState('All');
   const [sort, setSort] = useState<'newest' | 'views' | 'likes'>('newest');
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [heroFilmEndedSignal, setHeroFilmEndedSignal] = useState(0);
   const [activeService, setActiveService] = useState(0);
   const [servicePreviewActive, setServicePreviewActive] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
@@ -1448,16 +1530,20 @@ export default function CrownDEXV4() {
           <span className="cdx-ambient-blob cdx-ambient-blob--violet" />
           <span className="cdx-ambient-blob cdx-ambient-blob--cyan" />
           <span className="cdx-ambient-blob cdx-ambient-blob--indigo" />
+          <span className="cdx-galaxy-nebula cdx-galaxy-nebula--one" />
+          <span className="cdx-galaxy-nebula cdx-galaxy-nebula--two" />
+          <span className="cdx-galaxy-nebula cdx-galaxy-nebula--three" />
+          <span className="cdx-galaxy-dust" />
           <span className="cdx-ambient-grid" />
           <div className="cdx-galaxy-stars">
-            {Array.from({ length: 26 }, (_, index) => (
+            {Array.from({ length: 56 }, (_, index) => (
               <i key={index} style={{
-                left: `${(index * 43 + 11) % 97}%`,
-                top: `${(index * 59 + 17) % 94}%`,
-                width: `${index % 7 === 0 ? 5 : index % 3 === 0 ? 3 : 2}px`,
-                height: `${index % 7 === 0 ? 5 : index % 3 === 0 ? 3 : 2}px`,
-                animationDuration: `${9 + (index % 7) * 2.1}s`,
-                animationDelay: `${-index * 1.23}s`,
+                left: `${(index * 37 + 11) % 98}%`,
+                top: `${(index * 53 + 17) % 96}%`,
+                width: `${index % 11 === 0 ? 6 : index % 5 === 0 ? 4 : index % 2 === 0 ? 3 : 2}px`,
+                height: `${index % 11 === 0 ? 6 : index % 5 === 0 ? 4 : index % 2 === 0 ? 3 : 2}px`,
+                animationDuration: `${8.5 + (index % 9) * 1.55}s`,
+                animationDelay: `${-index * 0.92}s`,
               }} />
             ))}
           </div>
@@ -1492,32 +1578,33 @@ export default function CrownDEXV4() {
 
       <main>
         <section className="cdx-hero" id="home">
-          <div className="cdx-container cdx-hero-layout">
-            <div className="cdx-hero-copy">
-              <div className="cdx-hero-identity">
-                <span className="cdx-hero-avatar-wrap">
-                  {settings?.avatar_url ? <img src={settings.avatar_url} alt="CrownDEX profile" width={96} height={96} decoding="async" /> : <span className="cdx-hero-avatar-fallback">CDX</span>}
-                  <i aria-label="Online" />
-                </span>
-                <span className="cdx-hero-identity-copy">
-                  <strong>{siteContent.heroIdentity}</strong>
-
-                  <small>{siteContent.heroAvailability}</small>
-                </span>
+          <div className="cdx-container cdx-hero-layout cdx-hero-layout--unfold">
+            <div className="cdx-hero-copy cdx-hero-copy--unfold">
+              <div className="cdx-hero-unfold-intro">
+                {settings?.avatar_url && (
+                  <span className="cdx-hero-pfp" aria-hidden="true">
+                    <img src={settings.avatar_url} alt="" width={38} height={38} decoding="async" />
+                  </span>
+                )}
+                <span className="cdx-hero-unfold-line" />
+                <span>A CROWNDEX ORIGINAL · CINEMATIC DIRECTION</span>
               </div>
-              <div className="cdx-hero-wordmark" aria-label={`${siteContent.heroBrandLead}${siteContent.heroBrandAccent}`}><span>{siteContent.heroBrandLead}</span><em>{siteContent.heroBrandAccent}</em></div>
-              <h1 className="cdx-hero-headline" aria-label={`${siteContent.heroLineOneLead} ${siteContent.heroLineOneAccent} ${siteContent.heroLineTwoLead} ${siteContent.heroLineTwoAccent}`}><span className="cdx-hero-headline-line">{siteContent.heroLineOneLead} <em>{siteContent.heroLineOneAccent}</em></span><span className="cdx-hero-headline-line cdx-hero-headline-outline">{siteContent.heroLineTwoLead} <em>{siteContent.heroLineTwoAccent}</em></span></h1>
-              <p className="cdx-reveal-copy">{siteContent.heroDescription}</p>
-              <div className="cdx-hero-actions">
-                <a className="cdx-button cdx-button-gold cdx-magnetic" href="#work" data-cursor="VIEW">{siteContent.heroPrimaryCta} <ArrowUpRight size={15} /></a>
-                <a className="cdx-button cdx-button-outline cdx-magnetic" href="#about" data-cursor="VIEW">{siteContent.heroStudioCta} <ArrowUpRight size={15} /></a>
-                <a className="cdx-button cdx-button-outline cdx-magnetic" href={xProfileUrl} target="_blank" rel="noopener noreferrer" data-cursor="VIEW">{siteContent.heroSocialCta} <ArrowUpRight size={16} /></a>
+              <h1 className="cdx-hero-headline cdx-hero-headline--unfold" aria-label="Let the world unfold.">
+                <span className="cdx-hero-headline-line">LET THE</span>
+                <span className="cdx-hero-headline-line">WORLD</span>
+                <span className="cdx-hero-headline-line cdx-hero-headline-line--gold" data-text="UNFOLD.">UNFOLD.</span>
+              </h1>
+              <p className="cdx-reveal-copy cdx-hero-copy-body">A theatrical entrance opens onto a living film poster. The reveal is the first act, then the motion keeps breathing after the curtains part.</p>
+              <div className="cdx-hero-actions cdx-hero-actions--unfold">
+                <a className="cdx-button cdx-button-gold cdx-magnetic" href="#work" data-cursor="VIEW">Enter the work <ArrowUpRight size={15} /></a>
+                <a className="cdx-button cdx-button-outline cdx-magnetic" href="#about" data-cursor="VIEW">Meet the creator <ArrowUpRight size={16} /></a>
               </div>
-              <div className="cdx-hero-chips" aria-label="Creative services"><span>{siteContent.heroChipOne}</span><span>{siteContent.heroChipTwo}</span><span>{siteContent.heroChipThree}</span></div>
+              <div className="cdx-hero-chips cdx-hero-chips--unfold" aria-label="Creative services"><span>THEATRICAL REVEAL</span><span>LIVING POSTER</span><span>PORTAL STAGE</span></div>
             </div>
-            <div className="cdx-showreel-wrap">
+            <div className="cdx-showreel-wrap cdx-showreel-wrap--unfold">
+              <div className="cdx-showreel-topline" aria-hidden="true">FUSION 01 / THE REVEAL × LIVING POSTER × PORTAL</div>
               <span className="cdx-card-orbit cdx-card-orbit--hero" aria-hidden="true" />
-              <HeroShowreel work={showreelRow?.work} project={showreelRow?.project} reduced={reduced} onOpen={() => openWork(showreelRow?.work)} posterOverride={siteContent.heroShowreelPosterUrl} chipOne={siteContent.heroShowreelChipOne} chipTwo={siteContent.heroShowreelChipTwo} ratioLabel={siteContent.heroShowreelRatio} recLabel={siteContent.heroShowreelRecLabel} captionLabel={siteContent.heroShowreelCaptionLabel} fallbackTitle={siteContent.heroShowreelFallbackTitle} />
+              <HeroShowreel work={showreelRow?.work} project={showreelRow?.project} reduced={reduced} onOpen={() => openWork(showreelRow?.work)} filmEndedSignal={heroFilmEndedSignal} posterOverride={siteContent.heroShowreelPosterUrl} chipOne={siteContent.heroShowreelChipOne || 'LIVING POSTER'} chipTwo={siteContent.heroShowreelChipTwo || 'PORTAL STAGE'} ratioLabel="16:9 · WIDESCREEN" recLabel={siteContent.heroShowreelRecLabel || 'REC'} captionLabel={siteContent.heroShowreelCaptionLabel || 'GRAND UNFOLDING'} fallbackTitle={siteContent.heroShowreelFallbackTitle || 'Stories in motion.'} />
             </div>
           </div>
           <div className="cdx-hero-bottom cdx-container"><a href="#about" data-cursor="VIEW"><span>{siteContent.heroBottomLabel}</span><i /><ArrowRight size={14} /></a></div>
@@ -1638,7 +1725,7 @@ export default function CrownDEXV4() {
       </footer>
 
       <AnimatePresence>
-        {activeIndex !== null && works[activeIndex] && projectRows[activeIndex] && <FilmViewer key={works[activeIndex].id} work={works[activeIndex]} project={projectRows[activeIndex].project} allWorks={works} onClose={closeViewer} onPrev={previousWork} onNext={nextWork} />}
+        {activeIndex !== null && works[activeIndex] && projectRows[activeIndex] && <FilmViewer key={works[activeIndex].id} work={works[activeIndex]} project={projectRows[activeIndex].project} allWorks={works} onClose={closeViewer} onPrev={previousWork} onNext={nextWork} onVideoEnded={works[activeIndex].id === showreelRow?.work.id ? () => setHeroFilmEndedSignal(value => value + 1) : undefined} />}
       </AnimatePresence>
     </div>
   );
