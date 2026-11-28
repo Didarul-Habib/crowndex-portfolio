@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent as ReactChangeEvent, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type SyntheticEvent as ReactSyntheticEvent } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'framer-motion';
-import Lenis from 'lenis';
+import { AnimatePresence, motion, useReducedMotion, useScroll } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
@@ -411,35 +410,11 @@ function CustomCursor({ reduced }: { reduced: boolean }) {
     const label = labelRef.current;
     if (!finePointer || reduced || isLiteMode() || !dot || !ring || !label) return;
 
-    let x = 0, y = 0, ringX = 0, ringY = 0;
-    let frame = 0, rectFrame = 0, visible = false;
-    let activeTarget: HTMLElement | null = null;
-    let activeRect: DOMRect | null = null;
+    let x = 0;
+    let y = 0;
+    let frame = 0;
+    let visible = false;
     const root = document.documentElement;
-    const targetSelectors = ['.cdx-work-card', '.cdx-hero-actions .cdx-magnetic'];
-
-    const findTarget = (target: EventTarget | null): HTMLElement | null => {
-      if (!(target instanceof Element)) return null;
-      for (const selector of targetSelectors) {
-        const found = target.closest<HTMLElement>(selector);
-        if (found) return found;
-      }
-      return null;
-    };
-
-    const resetTarget = (target: HTMLElement | null) => {
-      if (!target) return;
-      for (const property of ['--cdx-tilt-x', '--cdx-tilt-y', '--cdx-mag-x', '--cdx-mag-y']) {
-        target.style.removeProperty(property);
-      }
-    };
-
-    const setTarget = (target: HTMLElement | null) => {
-      if (target === activeTarget) return;
-      resetTarget(activeTarget);
-      activeTarget = target;
-      activeRect = target ? target.getBoundingClientRect() : null;
-    };
 
     const setCursorMode = (target: EventTarget | null) => {
       if (!(target instanceof Element)) {
@@ -447,78 +422,36 @@ function CustomCursor({ reduced }: { reduced: boolean }) {
         ring.dataset.mode = '';
         return;
       }
+
       const cursorTarget = target.closest<HTMLElement>('[data-cursor]');
       const isPlay = cursorTarget?.dataset.cursor?.toUpperCase() === 'PLAY';
       const isLink = Boolean(target.closest('a,button'));
-      const mode = isPlay ? 'play' : isLink ? 'link' : '';
+      ring.dataset.mode = isPlay ? 'play' : isLink ? 'link' : '';
       label.textContent = isPlay ? 'PLAY' : '';
-      ring.dataset.mode = mode;
     };
 
-    const applyPointerEffects = () => {
-      if (!activeTarget || !activeRect) return;
-      const px = Math.max(0, Math.min(1, (x - activeRect.left) / Math.max(1, activeRect.width)));
-      const py = Math.max(0, Math.min(1, (y - activeRect.top) / Math.max(1, activeRect.height)));
-
-      if (activeTarget.matches('.cdx-work-card')) {
-        if (Number(root.dataset.cdxQuality || 0) >= 4) return;
-        activeTarget.style.setProperty('--cdx-tilt-x', `${(0.5 - py) * 4}deg`);
-        activeTarget.style.setProperty('--cdx-tilt-y', `${(px - 0.5) * 4}deg`);
-      } else if (activeTarget.matches('.cdx-magnetic')) {
-        const dx = (px - 0.5) * activeRect.width * 0.12;
-        const dy = (py - 0.5) * activeRect.height * 0.12;
-        activeTarget.style.setProperty('--cdx-mag-x', `${Math.max(-6, Math.min(6, dx))}px`);
-        activeTarget.style.setProperty('--cdx-mag-y', `${Math.max(-6, Math.min(6, dy))}px`);
-      }
-    };
-
+    // One requestAnimationFrame per pointer update; no perpetual easing loop.
     const tick = () => {
       frame = 0;
-      const dx = x - ringX;
-      const dy = y - ringY;
-      ringX += dx * 0.18;
-      ringY += dy * 0.18;
-      if (Math.abs(x - ringX) < 0.22) ringX = x;
-      if (Math.abs(y - ringY) < 0.22) ringY = y;
-      dot.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
-      ring.style.transform = `translate3d(${ringX}px, ${ringY}px, 0) translate(-50%, -50%)`;
-      applyPointerEffects();
-      const stillMoving = ringX !== x || ringY !== y;
-      dot.classList.toggle('is-moving', stillMoving);
-      ring.classList.toggle('is-moving', stillMoving);
-      if (stillMoving) frame = requestAnimationFrame(tick);
+      const transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+      dot.style.transform = transform;
+      ring.style.transform = transform;
     };
 
     const move = (event: PointerEvent) => {
       if (event.pointerType && event.pointerType !== 'mouse') return;
       x = event.clientX;
       y = event.clientY;
-      const target = event.target;
-      setTarget(findTarget(target));
-      setCursorMode(target);
+      setCursorMode(event.target);
+
       if (!visible) {
         visible = true;
-        ringX = x;
-        ringY = y;
         dot.style.opacity = '1';
         ring.style.opacity = '1';
         root.classList.add('cdx-cursor-active');
       }
+
       if (!frame) frame = requestAnimationFrame(tick);
-    };
-
-    const over = (event: PointerEvent) => {
-      setTarget(findTarget(event.target));
-      setCursorMode(event.target);
-    };
-
-    const refreshRect = () => {
-      if (!activeTarget || rectFrame) return;
-      rectFrame = requestAnimationFrame(() => {
-        rectFrame = 0;
-        if (activeTarget) activeRect = activeTarget.getBoundingClientRect();
-        if (!frame && visible) frame = requestAnimationFrame(tick);
-      });
     };
 
     const leave = () => {
@@ -527,29 +460,24 @@ function CustomCursor({ reduced }: { reduced: boolean }) {
       frame = 0;
       dot.style.opacity = '0';
       ring.style.opacity = '0';
-      dot.classList.remove('is-moving');
-      ring.classList.remove('is-moving');
       root.classList.remove('cdx-cursor-active', 'cdx-cursor-text');
-      setTarget(null);
+      ring.dataset.mode = '';
+      label.textContent = '';
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') leave();
     };
 
     window.addEventListener('pointermove', move, { passive: true });
-    window.addEventListener('pointerover', over, { passive: true });
-    window.addEventListener('scroll', refreshRect, { passive: true });
-    window.addEventListener('resize', refreshRect, { passive: true });
     window.addEventListener('pointerleave', leave);
-    const onVisibility = () => { if (document.visibilityState === 'hidden') leave(); };
     document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
-      cancelAnimationFrame(frame);
-      cancelAnimationFrame(rectFrame);
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerover', over);
-      window.removeEventListener('scroll', refreshRect);
-      window.removeEventListener('resize', refreshRect);
       window.removeEventListener('pointerleave', leave);
       document.removeEventListener('visibilitychange', onVisibility);
-      resetTarget(activeTarget);
       root.classList.remove('cdx-cursor-active', 'cdx-cursor-text');
     };
   }, [reduced]);
@@ -760,7 +688,7 @@ function Timecode({ reduced }: { reduced: boolean }) {
     };
     const start = () => {
       if (!visible || document.visibilityState !== 'visible' || timer !== undefined) return;
-      timer = window.setInterval(() => setFrames(value => value + 2), 80);
+      timer = window.setInterval(() => setFrames(value => value + 25), 1000);
     };
     const observer = new IntersectionObserver(entries => {
       visible = Boolean(entries[0]?.isIntersecting);
@@ -891,7 +819,7 @@ function HeroShowreel({ work, project, reduced, onOpen, filmEndedSignal, posterO
         <span className="cdx-showreel-ring cdx-showreel-ring--inner" />
       </div>
       {videoUrl && !videoFailed ? (
-        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onEnded={() => { pauseManagedVideo(videoRef.current); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
+        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onLoadedMetadata={(event) => { event.currentTarget.defaultPlaybackRate = 1; event.currentTarget.playbackRate = 1; }} onPlay={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onEnded={() => { pauseManagedVideo(videoRef.current); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
       ) : displayPoster ? (
         <img className="cdx-showreel-poster" src={displayPoster} alt={`${work && project ? titleFor(work, 0, project) : 'CrownDEX showreel'} poster`} fetchPriority="high" decoding="async" width={1280} height={720} />
       ) : (
@@ -998,7 +926,6 @@ function WorkCard({ work, project, index, open, reduced, featuredLayout = false 
       whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.12 }}
       transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
-      transformTemplate={(_: unknown, generated: string) => `perspective(1100px) rotateX(var(--cdx-tilt-x, 0deg)) rotateY(var(--cdx-tilt-y, 0deg)) ${generated}`}
     >
       <motion.button layoutId={`cdx-film-frame-${work.id}`} transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }} className={`cdx-work-visual ${previewPlaying ? 'is-previewing' : ''}`} type="button" onClick={open} onMouseEnter={startPreview} onMouseLeave={stopPreview} onFocus={startPreview} onBlur={stopPreview} aria-label={`Watch ${title}`} data-cursor="PLAY">
         {hasPoster ? <img className="cdx-work-poster" src={project.thumbnail} alt={`${title} poster`} loading="lazy" decoding="async" width="1280" height="720" onError={() => setPosterFailed(true)} /> : <div className="cdx-work-poster-fallback" aria-hidden="true"><svg className="cdx-pixel-crown" viewBox="0 0 32 32" shapeRendering="crispEdges"><path d="M3 9h4l3 6 6-10 6 10 3-6h4l-3 14H6L3 9Z" fill="currentColor"/><path d="M7 25h18v3H7z" fill="currentColor"/></svg><span>CROWNDEX ORIGINAL</span></div>}
@@ -1412,7 +1339,7 @@ export default function CrownDEXV4() {
   const yearsCreating = projectFile.creator.yearsCreating;
 
   const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 150, damping: 28 });
+  const progress = scrollYProgress;
   useEffect(() => {
     if (!backend) return;
     let alive = true;
@@ -1439,23 +1366,6 @@ export default function CrownDEXV4() {
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
-
-  useEffect(() => {
-    if (reduced) return;
-    gsap.registerPlugin(ScrollTrigger);
-    const lenis = new Lenis({ lerp: 0.1, smoothWheel: true, syncTouch: false });
-    lenis.on('scroll', ScrollTrigger.update);
-    const tick = (time: number) => lenis.raf(time * 1000);
-    let tickerRunning = true;
-    const stop = () => { if (!tickerRunning) return; gsap.ticker.remove(tick); lenis.stop(); tickerRunning = false; };
-    const start = () => { if (tickerRunning) return; lenis.start(); gsap.ticker.add(tick); tickerRunning = true; ScrollTrigger.refresh(); };
-    const onVisibility = () => { if (document.visibilityState === 'hidden') stop(); else start(); };
-    gsap.ticker.add(tick);
-    gsap.ticker.lagSmoothing(0);
-    document.addEventListener('visibilitychange', onVisibility);
-    requestAnimationFrame(() => ScrollTrigger.refresh());
-    return () => { document.removeEventListener('visibilitychange', onVisibility); stop(); lenis.destroy(); };
-  }, [reduced]);
 
   useEffect(() => {
     const onVisibility = () => document.documentElement.classList.toggle('cdx-page-hidden', document.visibilityState === 'hidden');
@@ -1634,9 +1544,9 @@ export default function CrownDEXV4() {
               </div>
               <label className="cdx-sort-control">{siteContent.sortLabel} <select value={sort} onChange={(event: ReactChangeEvent<HTMLSelectElement>) => setSort(event.target.value as 'newest' | 'views' | 'likes')}><option value="newest">Newest</option><option value="views">Most viewed</option><option value="likes">Most liked</option></select></label>
             </div>
-            <motion.div layout className="cdx-work-grid cdx-archive-grid">
+            <motion.div className="cdx-work-grid cdx-archive-grid">
               <AnimatePresence mode="popLayout">
-                {filteredRows.map((row, index) => <motion.div key={row.work.id} className="cdx-archive-cell" layout initial={reduced ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 0 }} transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}><WorkCard work={row.work} project={row.project} index={works.findIndex(item => item.id === row.work.id)} open={() => openWork(row.work)} reduced={reduced} /></motion.div>)}
+                {filteredRows.map((row, index) => <motion.div key={row.work.id} className="cdx-archive-cell" initial={reduced ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 0 }} transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}><WorkCard work={row.work} project={row.project} index={works.findIndex(item => item.id === row.work.id)} open={() => openWork(row.work)} reduced={reduced} /></motion.div>)}
               </AnimatePresence>
             </motion.div>
             {filteredRows.length === 0 && <p className="cdx-empty-state">No projects in this category yet.</p>}

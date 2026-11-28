@@ -2649,9 +2649,7 @@ html:is([data-cdx-quality="2"],[data-cdx-quality="3"],[data-cdx-quality="4"],[da
   display: none !important;
 }
 
-html:is([data-cdx-quality="3"],[data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-cursor-ring {
-  display: none !important;
-}
+/* Keep the custom cursor ring visible in low-FPS mode; the ring is an interaction cue, not a decorative workload. */
 
 html:is([data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-work-card,
 html:is([data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-showreel {
@@ -5499,3 +5497,114 @@ html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-orbit svg { an
     transition-duration: .01ms !important;
   }
 }
+
+
+/* ======================================================================
+   CROWNDEX PERFORMANCE PASS — 28 NOVEMBER 2026
+   Keep the cinematic identity and Grand Unfolding curtain choreography.
+   Remove continuous decorative loops and expensive blur/compositing work.
+   ====================================================================== */
+
+/* Static atmosphere: retain the galaxy composition without constant repainting. */
+.cdx-ambient-blob,
+.cdx-ambient-grid,
+.cdx-galaxy-nebula,
+.cdx-galaxy-dust,
+.cdx-galaxy-stars i,
+.cdx-galaxy-streak,
+.cdx-card-orbit,
+.cdx-ambient-drift::before,
+.cdx-site .cdx-about-art,
+.cdx-site .cdx-about-art .cdx-portrait-chip,
+.cdx-site .cdx-about-art .cdx-portrait-orbit svg,
+.cdx-showreel::before,
+.cdx-showreel-rec i,
+.cdx-showreel-chip,
+.cdx-showreel-progress span,
+.cdx-hero-bottom a i,
+.cdx-showreel-stage-light,
+.cdx-showreel-ring,
+.cdx-hero-copy--unfold::before,
+.cdx-hero-pfp::before,
+.cdx-hero-pfp::after,
+.cdx-hero-unfold-line,
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::before,
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after,
+.cdx-hero-wordmark em,
+.cdx-headline-shine,
+.cdx-wordmark-sheen,
+.cdx-headline-spectrum,
+.cdx-portrait-glow,
+.cdx-portrait-orbit,
+.cdx-portrait-chip,
+.cdx-hero-dust {
+  animation: none !important;
+}
+
+/* Avoid permanent layer promotion and expensive blur/mix-blend passes. */
+.cdx-ambient-blob {
+  will-change: auto !important;
+}
+
+.cdx-galaxy-nebula {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+.cdx-hero-copy--unfold::before,
+.cdx-showreel-wrap--unfold::before {
+  filter: none !important;
+}
+
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold,
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after {
+  filter: none !important;
+}
+
+/* The header remains translucent-looking, but no longer blurs the full page behind it. */
+.cdx-site .cdx-header {
+  background: rgba(var(--cdx-bg-rgb), .94) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Native browser scrolling replaces the always-running Lenis/GSAP scroll clock. */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Disable magnetic translation and 3D hover tilt; keep ordinary button/card feedback. */
+.cdx-site .cdx-magnetic {
+  translate: none !important;
+}
+
+.cdx-site .cdx-work-card {
+  transform-style: flat !important;
+}
+
+/* The marquee remains readable as a still editorial strip. */
+.cdx-site .cdx-marquee-track {
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+.cdx-site .cdx-marquee-track > span:nth-child(2) {
+  display: none !important;
+}
+
+/* The native cursor remains available in lite/reduced-motion mode.
+   On normal desktop pointers, keep both gold cursor elements visible. */
+html:not(.cdx-lite):not(.cdx-reduced-motion) .cdx-cursor-dot,
+html:not(.cdx-lite):not(.cdx-reduced-motion) .cdx-cursor-ring {
+  display: block;
+}
+
+/* Preserve the one-shot headline entrance, intro transition, modal transitions,
+   and the approved Grand Unfolding curtain open/close choreography. */
