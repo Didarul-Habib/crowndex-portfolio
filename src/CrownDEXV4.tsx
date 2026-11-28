@@ -247,27 +247,18 @@ function getXWidgets(): Promise<XWidgets> {
 }
 
 
-function isLiteMode() {
-  const params = new URLSearchParams(window.location.search);
-  const coarsePointer = window.matchMedia('(pointer: coarse)').matches
-    || window.matchMedia('(any-pointer: coarse)').matches;
-  const cores = navigator.hardwareConcurrency;
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  return params.get('lite') === '1'
-    || coarsePointer
-    || (typeof cores === 'number' && cores <= 4)
-    || (typeof memory === 'number' && memory <= 4);
-}
-
 function useAdaptiveQuality(reduced: boolean) {
   useEffect(() => {
     const root = document.documentElement;
     const params = new URLSearchParams(window.location.search);
     const forcedLite = params.get('lite') === '1';
-    const coarsePointer = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(any-pointer: coarse)').matches;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
     const cores = navigator.hardwareConcurrency;
     const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-    const autoLite = !forcedLite && !coarsePointer && ((typeof cores === 'number' && cores <= 4) || (typeof memory === 'number' && memory <= 4));
+    // Four logical processors alone must not force a modern desktop into static mode.
+    // Reserve auto-lite for very constrained devices; FPS sampling handles real runtime pressure.
+    const autoLite = !forcedLite && !coarsePointer
+      && ((typeof cores === 'number' && cores <= 2) || (typeof memory === 'number' && memory <= 4));
     const lite = forcedLite || coarsePointer || autoLite;
     root.classList.toggle('cdx-lite', lite);
     root.classList.toggle('cdx-lite-auto', autoLite);
@@ -396,98 +387,6 @@ function useSectionReveals(reduced: boolean, version: number) {
     requestAnimationFrame(() => ScrollTrigger.refresh());
     return () => context.revert();
   }, [reduced, version]);
-}
-
-function CustomCursor({ reduced }: { reduced: boolean }) {
-  const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
-  const labelRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    const label = labelRef.current;
-    if (!finePointer || reduced || isLiteMode() || !dot || !ring || !label) return;
-
-    let x = 0;
-    let y = 0;
-    let frame = 0;
-    let visible = false;
-    const root = document.documentElement;
-
-    const setCursorMode = (target: EventTarget | null) => {
-      if (!(target instanceof Element)) {
-        label.textContent = '';
-        ring.dataset.mode = '';
-        return;
-      }
-
-      const cursorTarget = target.closest<HTMLElement>('[data-cursor]');
-      const isPlay = cursorTarget?.dataset.cursor?.toUpperCase() === 'PLAY';
-      const isLink = Boolean(target.closest('a,button'));
-      ring.dataset.mode = isPlay ? 'play' : isLink ? 'link' : '';
-      label.textContent = isPlay ? 'PLAY' : '';
-    };
-
-    // One requestAnimationFrame per pointer update; no perpetual easing loop.
-    const tick = () => {
-      frame = 0;
-      const transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
-      dot.style.transform = transform;
-      ring.style.transform = transform;
-    };
-
-    const move = (event: PointerEvent) => {
-      if (event.pointerType && event.pointerType !== 'mouse') return;
-      x = event.clientX;
-      y = event.clientY;
-      setCursorMode(event.target);
-
-      if (!visible) {
-        visible = true;
-        dot.style.opacity = '1';
-        ring.style.opacity = '1';
-        root.classList.add('cdx-cursor-active');
-      }
-
-      if (!frame) frame = requestAnimationFrame(tick);
-    };
-
-    const leave = () => {
-      visible = false;
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
-      dot.style.opacity = '0';
-      ring.style.opacity = '0';
-      root.classList.remove('cdx-cursor-active', 'cdx-cursor-text');
-      ring.dataset.mode = '';
-      label.textContent = '';
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') leave();
-    };
-
-    window.addEventListener('pointermove', move, { passive: true });
-    window.addEventListener('pointerleave', leave);
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerleave', leave);
-      document.removeEventListener('visibilitychange', onVisibility);
-      root.classList.remove('cdx-cursor-active', 'cdx-cursor-text');
-    };
-  }, [reduced]);
-
-  return (
-    <>
-      <div ref={dotRef} className="cdx-cursor-dot" aria-hidden="true" />
-      <div ref={ringRef} className="cdx-cursor-ring" aria-hidden="true"><span ref={labelRef} /></div>
-    </>
-  );
 }
 
 function IntroLoader({ reduced }: { reduced: boolean }) {
@@ -808,15 +707,11 @@ function HeroShowreel({ work, project, reduced, onOpen, filmEndedSignal, posterO
   const displayRec = recLabel || 'REC';
 
   return (
-    <div ref={containerRef} className={`cdx-showreel cdx-showreel--unfold is-${curtainState}`} data-curtain-state={curtainState} data-video-ended={videoEnded ? 'true' : 'false'} aria-label="CrownDEX 16:9 widescreen showreel" data-cursor="PLAY">
+    <div ref={containerRef} className={`cdx-showreel cdx-showreel--unfold is-${curtainState}`} data-curtain-state={curtainState} data-video-ended={videoEnded ? 'true' : 'false'} aria-label="CrownDEX 16:9 widescreen showreel">
       <div className="cdx-showreel-stage-lights" aria-hidden="true">
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--one" />
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--two" />
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--three" />
-      </div>
-      <div className="cdx-showreel-rings" aria-hidden="true">
-        <span className="cdx-showreel-ring cdx-showreel-ring--outer" />
-        <span className="cdx-showreel-ring cdx-showreel-ring--inner" />
       </div>
       {videoUrl && !videoFailed ? (
         <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onLoadedMetadata={(event) => { event.currentTarget.defaultPlaybackRate = 1; event.currentTarget.playbackRate = 1; }} onPlay={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onEnded={() => { pauseManagedVideo(videoRef.current); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
@@ -921,13 +816,12 @@ function WorkCard({ work, project, index, open, reduced, featuredLayout = false 
     <motion.article
       ref={cardRef}
       className={`cdx-work-card${featuredLayout ? ' cdx-work-card--featured' : ''}`}
-      data-cursor="VIEW"
       initial={reduced ? false : { opacity: 0, y: 24 }}
       whileInView={reduced ? undefined : { opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.12 }}
       transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
     >
-      <motion.button layoutId={`cdx-film-frame-${work.id}`} transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }} className={`cdx-work-visual ${previewPlaying ? 'is-previewing' : ''}`} type="button" onClick={open} onMouseEnter={startPreview} onMouseLeave={stopPreview} onFocus={startPreview} onBlur={stopPreview} aria-label={`Watch ${title}`} data-cursor="PLAY">
+      <motion.button layoutId={`cdx-film-frame-${work.id}`} transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }} className={`cdx-work-visual ${previewPlaying ? 'is-previewing' : ''}`} type="button" onClick={open} onMouseEnter={startPreview} onMouseLeave={stopPreview} onFocus={startPreview} onBlur={stopPreview} aria-label={`Watch ${title}`}>
         {hasPoster ? <img className="cdx-work-poster" src={project.thumbnail} alt={`${title} poster`} loading="lazy" decoding="async" width="1280" height="720" onError={() => setPosterFailed(true)} /> : <div className="cdx-work-poster-fallback" aria-hidden="true"><svg className="cdx-pixel-crown" viewBox="0 0 32 32" shapeRendering="crispEdges"><path d="M3 9h4l3 6 6-10 6 10 3-6h4l-3 14H6L3 9Z" fill="currentColor"/><path d="M7 25h18v3H7z" fill="currentColor"/></svg><span>CROWNDEX ORIGINAL</span></div>}
         {previewUrl && !previewFailed && <video ref={videoRef} className={`cdx-work-preview${previewPlaying ? ' is-playing' : ''}${!hasPoster && frameReady ? ' is-frame' : ''}`} poster={project.thumbnail || undefined} muted={muted} playsInline loop preload="none" onLoadedMetadata={(event: ReactSyntheticEvent<HTMLVideoElement>) => {
           const video = event.currentTarget;
@@ -960,8 +854,8 @@ function WorkCard({ work, project, index, open, reduced, featuredLayout = false 
         </div>
         <ProjectStats project={project} reduced={reduced} className="cdx-work-stats" />
         <div className="cdx-work-footer">
-          <button type="button" onClick={open} data-cursor="PLAY">WATCH FILM <ArrowUpRight size={14} /></button>
-          {project.xUrl && <a href={project.xUrl} target="_blank" rel="noopener noreferrer" data-cursor="VIEW">VIEW ON X <ExternalLink size={13} /></a>}
+          <button type="button" onClick={open}>WATCH FILM <ArrowUpRight size={14} /></button>
+          {project.xUrl && <a href={project.xUrl} target="_blank" rel="noopener noreferrer">VIEW ON X <ExternalLink size={13} /></a>}
         </div>
       </div>
     </motion.article>
@@ -1099,7 +993,7 @@ function ContactForm({ email, content }: { email: string; content: SiteContent }
         <select name="projectType" defaultValue={content.contactProjectOptionOne}><option>{content.contactProjectOptionOne}</option><option>{content.contactProjectOptionTwo}</option><option>{content.contactProjectOptionThree}</option><option>{content.contactProjectOptionFour}</option><option>{content.contactProjectOptionFive}</option></select>
       </label>
       <label>{content.contactBriefLabel}<textarea name="brief" rows={4} placeholder={content.contactBriefPlaceholder} required maxLength={2500} /></label>
-      <button className="cdx-button cdx-button-gold cdx-form-submit cdx-magnetic" type="submit" data-cursor="VIEW">{email ? content.contactEmailButton : content.contactFormButton} <ArrowUpRight size={17} /></button>
+      <button className="cdx-button cdx-button-gold cdx-form-submit cdx-magnetic" type="submit">{email ? content.contactEmailButton : content.contactFormButton} <ArrowUpRight size={17} /></button>
       {notice && <p className="cdx-form-notice" role="status">{notice}</p>}
       {!email && <p className="cdx-form-hint">{content.contactFormHint}</p>}
     </form>
@@ -1116,7 +1010,7 @@ function CopyEmailButton({ email, label, copiedLabel }: { email: string; label: 
       window.setTimeout(() => setCopied(false), 1500);
     } catch { setCopied(false); }
   };
-  return <button className="cdx-copy-email cdx-magnetic" type="button" onClick={copy} data-cursor="VIEW"><Mail size={14} /> {copied ? copiedLabel : label} <ArrowUpRight size={13} /></button>;
+  return <button className="cdx-copy-email cdx-magnetic" type="button" onClick={copy}><Mail size={14} /> {copied ? copiedLabel : label} <ArrowUpRight size={13} /></button>;
 }
 
 function FpsCounter({ enabled }: { enabled: boolean }) {
@@ -1463,25 +1357,24 @@ export default function CrownDEXV4() {
       </div>
       <IntroLoader reduced={reduced} />
       <motion.div className="cdx-scroll-progress" style={{ scaleX: progress }} />
-      <CustomCursor reduced={reduced} />
       <FpsCounter enabled={debugMode} />
 
       <header className="cdx-header">
-        <a href="#home" className="cdx-logo cdx-magnetic" aria-label="CrownDEX home" onClick={() => setMenuOpen(false)} data-cursor="VIEW">
+        <a href="#home" className="cdx-logo cdx-magnetic" aria-label="CrownDEX home" onClick={() => setMenuOpen(false)}>
           {settings?.avatar_url && <img src={settings.avatar_url} alt="" className="cdx-logo-avatar" width={34} height={34} decoding="async" />}
           <span>{siteContent.heroBrandLead}<span className="cdx-logo-accent">{siteContent.heroBrandAccent}</span></span>
         </a>
         <nav className="cdx-nav" aria-label="Main navigation">
-          {nav.map(item => <a key={item.href} href={item.href} className={activeSection === item.href.slice(1) ? 'is-active' : ''} data-cursor="VIEW">{item.label}</a>)}
+          {nav.map(item => <a key={item.href} href={item.href} className={activeSection === item.href.slice(1) ? 'is-active' : ''}>{item.label}</a>)}
         </nav>
-        <a className="cdx-header-cta cdx-header-cta--nova" href="#contact" data-cursor="VIEW"><span className="cdx-cta-label">{siteContent.headerCta}</span><span className="cdx-cta-icon" aria-hidden="true"><ArrowUpRight size={16} /></span></a>
+        <a className="cdx-header-cta cdx-header-cta--nova" href="#contact"><span className="cdx-cta-label">{siteContent.headerCta}</span><span className="cdx-cta-icon" aria-hidden="true"><ArrowUpRight size={16} /></span></a>
         <button className="cdx-menu-button cdx-magnetic" type="button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}</button>
       </header>
 
       <AnimatePresence>
         {menuOpen && (
           <motion.nav className="cdx-mobile-nav" aria-label="Mobile navigation" initial={{ opacity: 0, clipPath: 'inset(0 0 100% 0)' }} animate={{ opacity: 1, clipPath: 'inset(0 0 0% 0)' }} exit={{ opacity: 0, clipPath: 'inset(0 0 100% 0)' }} transition={{ duration: 0.32 }}>
-            {nav.map((item, index) => <motion.a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.055, duration: 0.32 }} data-cursor="VIEW">{item.label}<ArrowUpRight size={19} /></motion.a>)}
+            {nav.map((item, index) => <motion.a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.055, duration: 0.32 }}>{item.label}<ArrowUpRight size={19} /></motion.a>)}
           </motion.nav>
         )}
       </AnimatePresence>
@@ -1506,18 +1399,17 @@ export default function CrownDEXV4() {
               </h1>
               <p className="cdx-reveal-copy cdx-hero-copy-body">A theatrical entrance opens onto a living film poster. The reveal is the first act, then the motion keeps breathing after the curtains part.</p>
               <div className="cdx-hero-actions cdx-hero-actions--unfold">
-                <a className="cdx-button cdx-button-gold cdx-magnetic" href="#work" data-cursor="VIEW">Enter the work <ArrowUpRight size={15} /></a>
-                <a className="cdx-button cdx-button-outline cdx-magnetic" href="#about" data-cursor="VIEW">Meet the creator <ArrowUpRight size={16} /></a>
+                <a className="cdx-button cdx-button-gold cdx-magnetic" href="#work">Enter the work <ArrowUpRight size={15} /></a>
+                <a className="cdx-button cdx-button-outline cdx-magnetic" href="#about">Meet the creator <ArrowUpRight size={16} /></a>
               </div>
               <div className="cdx-hero-chips cdx-hero-chips--unfold" aria-label="Creative services"><span>THEATRICAL REVEAL</span><span>LIVING POSTER</span><span>PORTAL STAGE</span></div>
             </div>
             <div className="cdx-showreel-wrap cdx-showreel-wrap--unfold">
               <div className="cdx-showreel-topline" aria-hidden="true">FUSION 01 / THE REVEAL × LIVING POSTER × PORTAL</div>
-              <span className="cdx-card-orbit cdx-card-orbit--hero" aria-hidden="true" />
               <HeroShowreel work={showreelRow?.work} project={showreelRow?.project} reduced={reduced} onOpen={() => openWork(showreelRow?.work)} filmEndedSignal={heroFilmEndedSignal} posterOverride={siteContent.heroShowreelPosterUrl} chipOne={siteContent.heroShowreelChipOne || 'LIVING POSTER'} chipTwo={siteContent.heroShowreelChipTwo || 'PORTAL STAGE'} ratioLabel="16:9 · WIDESCREEN" recLabel={siteContent.heroShowreelRecLabel || 'REC'} captionLabel={siteContent.heroShowreelCaptionLabel || 'GRAND UNFOLDING'} fallbackTitle={siteContent.heroShowreelFallbackTitle || 'Stories in motion.'} />
             </div>
           </div>
-          <div className="cdx-hero-bottom cdx-container"><a href="#about" data-cursor="VIEW"><span>{siteContent.heroBottomLabel}</span><i /><ArrowRight size={14} /></a></div>
+          <div className="cdx-hero-bottom cdx-container"><a href="#about"><span>{siteContent.heroBottomLabel}</span><i /><ArrowRight size={14} /></a></div>
         </section>
 
         <section className="cdx-section cdx-featured" id="work">
@@ -1562,8 +1454,7 @@ export default function CrownDEXV4() {
                 {services.map((service, index) => <button key={service.number} type="button" className={`cdx-service-row ${activeService === index ? 'is-active' : ''}`} aria-expanded={activeService === index}
                   onClick={() => { setActiveService(index); setServicePreviewActive(true); }}
                   onMouseEnter={() => { setActiveService(index); setServicePreviewActive(true); }}
-                  onFocus={() => { setActiveService(index); setServicePreviewActive(true); }}
-                  data-cursor="VIEW"><span className="cdx-service-number">{service.number}</span><span className="cdx-service-row-copy"><strong>{service.title}</strong><span className="cdx-service-description">{activeService === index ? service.description : siteContent.serviceExploreLabel}</span></span><ArrowUpRight size={20} /></button>)}
+                  onFocus={() => { setActiveService(index); setServicePreviewActive(true); }}><span className="cdx-service-number">{service.number}</span><span className="cdx-service-row-copy"><strong>{service.title}</strong><span className="cdx-service-description">{activeService === index ? service.description : siteContent.serviceExploreLabel}</span></span><ArrowUpRight size={20} /></button>)}
               </div>
               <ServiceCategoryPreview row={activeServiceRow} service={activeServiceItem} active={servicePreviewActive} reduced={reduced}
                 fallbackEyebrow={siteContent.servicePreviewFallbackEyebrow} fallbackTitle="COMING SOON"
@@ -1591,7 +1482,7 @@ export default function CrownDEXV4() {
                     {programs.map(program => <article key={program.id} className="cdx-program-card">
                       <div className="cdx-program-logo">{program.logo_url ? <img src={program.logo_url} alt={`${program.name} logo`} loading="lazy" decoding="async" width={52} height={52} /> : <span>{program.name.slice(0, 1).toUpperCase()}</span>}</div>
                       <div className="cdx-program-copy"><span>{program.role || 'CREATOR PROGRAMME'}</span><h3>{program.name}</h3>{program.description && <p>{program.description}</p>}</div>
-                      {program.url && <a href={program.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${program.name}`} data-cursor="VIEW"><ArrowUpRight size={18} /></a>}
+                      {program.url && <a href={program.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${program.name}`}><ArrowUpRight size={18} /></a>}
                     </article>)}
                   </div>
                 </div>
@@ -1621,7 +1512,7 @@ export default function CrownDEXV4() {
 
         <section className="cdx-section cdx-contact" id="contact">
           <div className="cdx-container cdx-contact-layout">
-            <div className="cdx-contact-copy"><span className="cdx-eyebrow">{siteContent.contactEyebrow.replace(/^06\s*\//, '05 /')}</span><h2><span className="cdx-heading-word">{siteContent.contactTitleLead}</span><br /><em className="cdx-heading-word">{siteContent.contactTitleAccent}</em></h2><p className="cdx-reveal-copy">{siteContent.contactDescription}</p>{effectiveContactEmail && <div className="cdx-contact-links"><a className="cdx-magnetic" href={`mailto:${effectiveContactEmail}`} data-cursor="VIEW"><Mail size={15} /> {siteContent.contactLinkEmailLabel} <ArrowUpRight size={15} /></a><CopyEmailButton email={effectiveContactEmail} label={siteContent.contactCopyEmailLabel} copiedLabel={siteContent.contactCopyEmailCopiedLabel} /></div>}</div>
+            <div className="cdx-contact-copy"><span className="cdx-eyebrow">{siteContent.contactEyebrow.replace(/^06\s*\//, '05 /')}</span><h2><span className="cdx-heading-word">{siteContent.contactTitleLead}</span><br /><em className="cdx-heading-word">{siteContent.contactTitleAccent}</em></h2><p className="cdx-reveal-copy">{siteContent.contactDescription}</p>{effectiveContactEmail && <div className="cdx-contact-links"><a className="cdx-magnetic" href={`mailto:${effectiveContactEmail}`}><Mail size={15} /> {siteContent.contactLinkEmailLabel} <ArrowUpRight size={15} /></a><CopyEmailButton email={effectiveContactEmail} label={siteContent.contactCopyEmailLabel} copiedLabel={siteContent.contactCopyEmailCopiedLabel} /></div>}</div>
             <div className="cdx-contact-panel"><ContactForm email={effectiveContactEmail} content={siteContent} /></div>
           </div>
         </section>
@@ -1629,8 +1520,8 @@ export default function CrownDEXV4() {
 
       <footer className="cdx-footer">
         <div className="cdx-container cdx-footer-inner">
-          <div className="cdx-footer-topline"><span>{siteContent.footerLeftLabel}</span><a href="#home" className="cdx-footer-wordmark" data-cursor="VIEW">{siteContent.footerBrand}</a><span>{siteContent.footerRightLabel} · © {new Date().getFullYear()}</span></div>
-          <div className="cdx-footer-bottom"><a className="cdx-footer-social cdx-footer-social-x" href={xProfileUrl} target="_blank" rel="noopener noreferrer" data-cursor="VIEW"><span className="cdx-footer-social-icon">𝕏</span><span className="cdx-footer-social-copy"><strong>{siteContent.footerXLabel}</strong><small>{siteContent.footerXHandle}</small></span><ArrowUpRight size={17} /></a><a className="cdx-footer-social cdx-footer-social-telegram" href={telegramUrl} target="_blank" rel="noopener noreferrer" data-cursor="VIEW"><span className="cdx-footer-social-icon"><Send size={19}/></span><span className="cdx-footer-social-copy"><strong>{siteContent.footerTelegramLabel}</strong><small>{siteContent.footerTelegramHandle}</small></span><ArrowUpRight size={17} /></a>{effectiveContactEmail && <a className="cdx-footer-social cdx-footer-social-email" href={`mailto:${effectiveContactEmail}`} data-cursor="VIEW"><span className="cdx-footer-social-icon"><Mail size={18}/></span><span className="cdx-footer-social-copy"><strong>{siteContent.footerEmailLabel}</strong><small>{effectiveContactEmail}</small></span><ArrowUpRight size={17} /></a>}<a href="#home" className="cdx-back-top" aria-label="Back to top"><svg viewBox="0 0 44 44" aria-hidden="true"><circle className="cdx-back-ring-track" cx="22" cy="22" r="18" /><motion.circle className="cdx-back-ring-progress" cx="22" cy="22" r="18" pathLength={progress} /></svg><span>{siteContent.footerBackTopLabel} <ArrowUpRight size={13} /></span></a></div>
+          <div className="cdx-footer-topline"><span>{siteContent.footerLeftLabel}</span><a href="#home" className="cdx-footer-wordmark">{siteContent.footerBrand}</a><span>{siteContent.footerRightLabel} · © {new Date().getFullYear()}</span></div>
+          <div className="cdx-footer-bottom"><a className="cdx-footer-social cdx-footer-social-x" href={xProfileUrl} target="_blank" rel="noopener noreferrer"><span className="cdx-footer-social-icon">𝕏</span><span className="cdx-footer-social-copy"><strong>{siteContent.footerXLabel}</strong><small>{siteContent.footerXHandle}</small></span><ArrowUpRight size={17} /></a><a className="cdx-footer-social cdx-footer-social-telegram" href={telegramUrl} target="_blank" rel="noopener noreferrer"><span className="cdx-footer-social-icon"><Send size={19}/></span><span className="cdx-footer-social-copy"><strong>{siteContent.footerTelegramLabel}</strong><small>{siteContent.footerTelegramHandle}</small></span><ArrowUpRight size={17} /></a>{effectiveContactEmail && <a className="cdx-footer-social cdx-footer-social-email" href={`mailto:${effectiveContactEmail}`}><span className="cdx-footer-social-icon"><Mail size={18}/></span><span className="cdx-footer-social-copy"><strong>{siteContent.footerEmailLabel}</strong><small>{effectiveContactEmail}</small></span><ArrowUpRight size={17} /></a>}<a href="#home" className="cdx-back-top" aria-label="Back to top"><svg viewBox="0 0 44 44" aria-hidden="true"><circle className="cdx-back-ring-track" cx="22" cy="22" r="18" /><motion.circle className="cdx-back-ring-progress" cx="22" cy="22" r="18" pathLength={progress} /></svg><span>{siteContent.footerBackTopLabel} <ArrowUpRight size={13} /></span></a></div>
         </div>
       </footer>
 

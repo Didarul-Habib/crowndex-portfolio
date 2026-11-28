@@ -724,19 +724,6 @@
 .cdx-film-foot { min-height: 60px; }
 .cdx-film-foot > span { color: var(--cdx-muted); font: 8px var(--cdx-font-mono); }
 
-/* Custom cursor: precise gold point plus a softly-lagged ring. */
-.cdx-cursor-dot,.cdx-cursor-ring { position: fixed; z-index: 950; top: 0; left: 0; pointer-events: none; opacity: 0; will-change: transform,opacity; }
-.cdx-cursor-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cdx-gold); box-shadow: 0 0 12px rgba(232,176,75,.7); }
-.cdx-cursor-ring { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(232,176,75,.62); border-radius: 50%; background: rgba(232,176,75,.035); color: var(--cdx-text); transition: width .22s var(--cdx-ease-out),height .22s var(--cdx-ease-out),background .22s ease,border-color .22s ease; }
-.cdx-cursor-ring span { font: 7px var(--cdx-font-mono); letter-spacing: .06em; }
-.cdx-cursor-ring[data-mode="play"],.cdx-cursor-ring[data-mode="view"],.cdx-cursor-ring[data-mode="drag"] { width: 66px; height: 66px; background: rgba(232,176,75,.12); border-color: var(--cdx-gold); }
-.cdx-cursor-ring[data-mode="play"] { width: 76px; height: 76px; }
-.cdx-cursor-ring[data-mode="drag"] { border-style: dashed; }
-.cdx-cursor-text .cdx-cursor-ring { width: 18px; height: 18px; background: rgba(232,176,75,.12); }
-.cdx-cursor-text .cdx-cursor-ring span { display: none; }
-.cdx-cursor-active,.cdx-cursor-active body { cursor: none; }
-.cdx-cursor-active .cdx-site a,.cdx-cursor-active .cdx-site button { cursor: none; }
-.cdx-cursor-active .cdx-site input,.cdx-cursor-active .cdx-site textarea,.cdx-cursor-active .cdx-site select { cursor: text; }
 
 /* Intro curtain and micro-details. */
 .cdx-intro-loader { position: fixed; z-index: 1100; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #0B0B0F; color: var(--cdx-text); clip-path: inset(0 0 0 0); }
@@ -1547,14 +1534,6 @@ html[data-cdx-theme="light"] .cdx-work-poster-fallback { background: radial-grad
 }
 .cdx-hero-avatar-wrap img { object-position: center; }
 
-/* Keep the normal operating-system pointer, including link/button cursor states. */
-.cdx-cursor-dot,
-.cdx-cursor-ring { display: none !important; }
-html.cdx-cursor-active,
-html.cdx-cursor-active body,
-html.cdx-cursor-active .cdx-site { cursor: auto !important; }
-html.cdx-cursor-active .cdx-site a,
-html.cdx-cursor-active .cdx-site button { cursor: pointer !important; }
 
 /* Responsive rules: stack the showreel before the layout can clip it. */
 @media (max-width: 1279px) {
@@ -2660,8 +2639,7 @@ html:is([data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-showreel {
 }
 
 html[data-cdx-quality="5"] .cdx-ambient-blob,
-html[data-cdx-quality="5"] .cdx-ambient-grid,
-html[data-cdx-quality="5"] .cdx-about-art {
+html[data-cdx-quality="5"] .cdx-ambient-grid {
   animation: none !important;
   transform: none !important;
   translate: none !important;
@@ -2819,22 +2797,6 @@ html[data-cdx-theme="light"] .cdx-ambient-background::before {
   opacity: 0.018;
 }
 
-html.cdx-cursor-active,
-html.cdx-cursor-active body,
-html.cdx-cursor-active .cdx-site {
-  cursor: none !important;
-}
-
-html.cdx-cursor-active .cdx-site a,
-html.cdx-cursor-active .cdx-site button {
-  cursor: none !important;
-}
-
-html.cdx-cursor-active .cdx-site input,
-html.cdx-cursor-active .cdx-site textarea,
-html.cdx-cursor-active .cdx-site select {
-  cursor: text !important;
-}
 
 
 /* Final contrast fixes for theme surfaces and compact metadata. */
@@ -5500,86 +5462,356 @@ html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-orbit svg { an
 
 
 /* ======================================================================
-   CROWNDEX PERFORMANCE PASS — 28 NOVEMBER 2026
-   Keep the cinematic identity and Grand Unfolding curtain choreography.
-   Remove continuous decorative loops and expensive blur/compositing work.
+   CROWNDEX MOTION RESTORE — 28 NOVEMBER 2026
+   Bring back the site's signature motion without restoring cursor effects,
+   oversized hero orbits, animated blur, or unnecessary 3D tracking.
    ====================================================================== */
 
-/* Static atmosphere: retain the galaxy composition without constant repainting. */
-.cdx-ambient-blob,
-.cdx-ambient-grid,
-.cdx-galaxy-nebula,
-.cdx-galaxy-dust,
-.cdx-galaxy-stars i,
-.cdx-galaxy-streak,
-.cdx-card-orbit,
-.cdx-ambient-drift::before,
-.cdx-site .cdx-about-art,
-.cdx-site .cdx-about-art .cdx-portrait-chip,
-.cdx-site .cdx-about-art .cdx-portrait-orbit svg,
-.cdx-showreel::before,
-.cdx-showreel-rec i,
-.cdx-showreel-chip,
-.cdx-showreel-progress span,
-.cdx-hero-bottom a i,
-.cdx-showreel-stage-light,
-.cdx-showreel-ring,
-.cdx-hero-copy--unfold::before,
-.cdx-hero-pfp::before,
-.cdx-hero-pfp::after,
-.cdx-hero-unfold-line,
-.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::before,
-.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after,
-.cdx-hero-wordmark em,
-.cdx-headline-shine,
-.cdx-wordmark-sheen,
-.cdx-headline-spectrum,
-.cdx-portrait-glow,
-.cdx-portrait-orbit,
-.cdx-portrait-chip,
-.cdx-hero-dust {
-  animation: none !important;
+/* Keep the midnight atmosphere alive with slow transform-only movement. */
+:root {
+  --bg-speed: 1.12;
 }
 
-/* Avoid permanent layer promotion and expensive blur/mix-blend passes. */
+.cdx-ambient-background::after {
+  /* Keep the diagonal light and vignette; remove the two oversized orbital rings. */
+  background:
+    linear-gradient(112deg,
+      transparent 0 59%,
+      rgba(var(--cdx-ambient-violet-rgb), .045) 59.2% 66%,
+      transparent 66.2%),
+    radial-gradient(ellipse at center,
+      transparent 54%,
+      rgba(var(--cdx-bg-rgb), .42) 100%) !important;
+}
+
+.cdx-ambient-drift::before {
+  display: none !important;
+}
+
 .cdx-ambient-blob {
   will-change: auto !important;
+}
+
+.cdx-ambient-blob--violet {
+  animation: cdx-ambient-violet 38s ease-in-out infinite alternate !important;
+}
+
+.cdx-ambient-blob--cyan {
+  animation: cdx-ambient-cyan 47s ease-in-out infinite alternate !important;
+}
+
+.cdx-ambient-blob--indigo {
+  animation: cdx-ambient-indigo 56s ease-in-out infinite alternate !important;
+}
+
+.cdx-ambient-grid {
+  animation: cdx-ambient-grid-drift 105s linear infinite !important;
 }
 
 .cdx-galaxy-nebula {
   filter: none !important;
   mix-blend-mode: normal !important;
+  animation: cdx-nebula-breathe 38s ease-in-out infinite alternate !important;
 }
 
-.cdx-hero-copy--unfold::before,
-.cdx-showreel-wrap--unfold::before {
+.cdx-galaxy-nebula--two {
+  animation-duration: 46s !important;
+}
+
+.cdx-galaxy-nebula--three {
+  animation-duration: 54s !important;
+}
+
+.cdx-galaxy-dust {
+  opacity: .38;
+  animation: cdx-dust-drift 48s linear infinite !important;
+}
+
+/* Keep a visible galaxy field, but animate only the first 24 stars. */
+.cdx-galaxy-stars i {
+  animation-name: cdx-galaxy-drift !important;
+  animation-timing-function: ease-in-out !important;
+  animation-iteration-count: infinite !important;
+  animation-direction: alternate !important;
+}
+
+.cdx-galaxy-stars i:nth-child(n+25) {
+  animation: none !important;
+  opacity: .28;
+  box-shadow: none;
+}
+
+.cdx-galaxy-streak--one {
+  animation: cdx-galaxy-streak-pass 24s ease-out -8s infinite !important;
+}
+
+.cdx-galaxy-streak--two {
+  animation: cdx-galaxy-streak-pass 31s ease-out -14s infinite !important;
+}
+
+/* The headline gets its staggered, one-time theatrical unfold again. */
+.cdx-hero-headline--unfold .cdx-hero-headline-line {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scaleY(.88);
+  transform-origin: 50% 100%;
+  animation: cdx-grand-headline-unfold .92s cubic-bezier(.2,.75,.25,1) both !important;
+}
+
+.cdx-hero-headline--unfold .cdx-hero-headline-line:nth-child(1) {
+  animation-delay: .16s !important;
+}
+
+.cdx-hero-headline--unfold .cdx-hero-headline-line:nth-child(2) {
+  animation-delay: .34s !important;
+}
+
+.cdx-hero-headline--unfold .cdx-hero-headline-line:nth-child(3) {
+  animation-delay: .52s !important;
+}
+
+@keyframes cdx-grand-headline-unfold {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scaleY(.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleY(1);
+  }
+}
+
+/* One restrained light pass across UNFOLD, rather than a constant shimmer. */
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::before {
+  opacity: 0;
   filter: none !important;
+  animation: cdx-grand-unfold-sheen 1.35s ease-in-out 1.55s both !important;
 }
 
-.cdx-hero-headline--unfold .cdx-hero-headline-line--gold,
+@keyframes cdx-grand-unfold-sheen {
+  0% {
+    opacity: 0;
+    background-position: -150% 0;
+  }
+  24% {
+    opacity: .9;
+  }
+  100% {
+    opacity: 0;
+    background-position: 150% 0;
+  }
+}
+
 .cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after {
   filter: none !important;
+  animation: cdx-unfold-glow 9s ease-in-out 1s infinite !important;
 }
 
-/* The header remains translucent-looking, but no longer blurs the full page behind it. */
+.cdx-hero-copy--unfold::before {
+  filter: none !important;
+  animation: cdx-left-signal-breathe 22s ease-in-out infinite alternate !important;
+}
+
+.cdx-hero-pfp::before {
+  animation: cdx-pfp-orbit 18s linear infinite !important;
+}
+
+.cdx-hero-pfp::after {
+  animation: cdx-pfp-pulse 5.8s ease-in-out infinite !important;
+}
+
+.cdx-hero-unfold-line {
+  animation: cdx-left-signal-line 6s ease-in-out infinite !important;
+}
+
+/* Remove the oversized circles around the curtain showreel.
+   The curtain opening remains untouched and keeps its full choreography. */
+.cdx-showreel-rings,
+.cdx-showreel-ring,
+.cdx-card-orbit--hero,
+.cdx-showreel-wrap--unfold::before,
+.cdx-showreel-wrap--unfold::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+
+.cdx-showreel-stage-light {
+  animation: cdx-stage-light-twinkle 4.8s ease-in-out infinite !important;
+}
+
+.cdx-showreel-stage-light--two {
+  animation-delay: 1.2s !important;
+}
+
+.cdx-showreel-stage-light--three {
+  animation-delay: 2.4s !important;
+}
+
+/* Restore the About portrait's layered floating composition.
+   All motion uses transform/opacity; no pointer tracking or 3D tilt. */
+.cdx-site .cdx-about-art {
+  animation: cdx-portrait-group-float 9.2s ease-in-out infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-about-photo-frame {
+  animation: cdx-portrait-float 10.5s ease-in-out -2s infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-chip-one {
+  animation: cdx-tag-float-a 7.2s ease-in-out infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-chip-two {
+  animation: cdx-tag-float-b 8.4s ease-in-out -2.1s infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-chip-three {
+  animation: cdx-tag-float-a 7.8s ease-in-out -2.8s infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-orbit {
+  animation: cdx-profile-orbit-float 9.6s ease-in-out -1.6s infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-orbit svg {
+  animation: cdx-label-orbit 42s linear infinite !important;
+}
+
+.cdx-site .cdx-about-art .cdx-portrait-badge {
+  animation: cdx-profile-badge-float 8.8s ease-in-out -3s infinite !important;
+}
+
+@keyframes cdx-profile-orbit-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(4px, -7px, 0); }
+}
+
+@keyframes cdx-profile-badge-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
+}
+
+/* Restore the continuous editorial ticker. The observer pauses it off-screen. */
+.cdx-site .cdx-marquee-track {
+  animation: cdx-marquee-scroll 29s linear infinite !important;
+  transform: translate3d(0, 0, 0);
+  will-change: auto !important;
+}
+
+.cdx-site .cdx-marquee-track > span:nth-child(2) {
+  display: block !important;
+}
+
+html.cdx-lite .cdx-marquee-track,
+html.cdx-page-hidden .cdx-marquee-track {
+  animation-play-state: paused !important;
+}
+
+/* Keep adaptive quality progressive: reduce the number of moving stars,
+   not every animation at once. The i3/4-thread laptop no longer auto-enters lite. */
+html:is([data-cdx-quality="1"],[data-cdx-quality="2"],[data-cdx-quality="3"],[data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-streak {
+  display: none !important;
+}
+
+html:is([data-cdx-quality="2"],[data-cdx-quality="3"],[data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-stars i:nth-child(-n+18) {
+  animation: cdx-galaxy-drift 18s ease-in-out infinite alternate !important;
+}
+
+html:is([data-cdx-quality="3"],[data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-stars i:nth-child(-n+12) {
+  animation: cdx-galaxy-drift 20s ease-in-out infinite alternate !important;
+}
+
+html:is([data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-stars i:nth-child(-n+8) {
+  animation: cdx-galaxy-drift 22s ease-in-out infinite alternate !important;
+}
+
+html[data-cdx-quality="5"] .cdx-galaxy-stars i:nth-child(-n+6) {
+  animation: cdx-galaxy-drift 24s ease-in-out infinite alternate !important;
+}
+
+html:is([data-cdx-quality="3"],[data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-dust,
+html:is([data-cdx-quality="4"],[data-cdx-quality="5"]) .cdx-galaxy-nebula--three {
+  animation: none !important;
+}
+
+html[data-cdx-quality="5"] .cdx-ambient-blob--indigo {
+  animation: none !important;
+}
+
+/* Forced lite remains a deliberate low-motion option. Auto-lite keeps six stars
+   and a gentle profile float on genuinely constrained desktop devices. */
+html.cdx-lite:not(.cdx-lite-auto) .cdx-galaxy-stars i {
+  animation: none !important;
+}
+
+
+
+/* Auto-lite desktop keeps the profile's small independent details in motion,
+   but this only runs when the OS has not requested reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-about-art .cdx-portrait-chip-one {
+    animation: cdx-tag-float-a 11s ease-in-out infinite !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-about-art .cdx-portrait-chip-two {
+    animation: cdx-tag-float-b 12s ease-in-out -2s infinite !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-about-art .cdx-portrait-chip-three {
+    animation: cdx-tag-float-a 11.5s ease-in-out -2.8s infinite !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-about-art .cdx-portrait-orbit svg {
+    animation: cdx-label-orbit 52s linear infinite !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-about-art .cdx-portrait-badge {
+    animation: cdx-profile-badge-float 12s ease-in-out -3s infinite !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto .cdx-galaxy-nebula--two,
+  html.cdx-lite.cdx-lite-auto .cdx-galaxy-nebula--three {
+    animation: none !important;
+  }
+
+  html.cdx-lite.cdx-lite-auto:not(.cdx-page-hidden) .cdx-site .cdx-marquee-track {
+    animation-play-state: running !important;
+  }
+}
+
+/* Keep the current performance guardrails: no custom cursor, no magnetic
+   pointer-follow, no card tilt, no animated blur and no header backdrop blur. */
+.cdx-site,
+.cdx-site a,
+.cdx-site button,
+.cdx-site input,
+.cdx-site textarea,
+.cdx-site select {
+  cursor: auto;
+}
+
+.cdx-site a,
+.cdx-site button,
+.cdx-site [role="button"] {
+  cursor: pointer;
+}
+
+.cdx-site input,
+.cdx-site textarea,
+.cdx-site select {
+  cursor: text;
+}
+
 .cdx-site .cdx-header {
   background: rgba(var(--cdx-bg-rgb), .94) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-/* Native browser scrolling replaces the always-running Lenis/GSAP scroll clock. */
 html {
   scroll-behavior: smooth;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Disable magnetic translation and 3D hover tilt; keep ordinary button/card feedback. */
 .cdx-site .cdx-magnetic {
   translate: none !important;
 }
@@ -5588,23 +5820,144 @@ html {
   transform-style: flat !important;
 }
 
-/* The marquee remains readable as a still editorial strip. */
-.cdx-site .cdx-marquee-track {
-  animation: none !important;
-  transform: none !important;
-  will-change: auto !important;
+/* Stop decorative motion when the tab is hidden. */
+html.cdx-page-hidden .cdx-ambient-blob,
+html.cdx-page-hidden .cdx-ambient-grid,
+html.cdx-page-hidden .cdx-galaxy-nebula,
+html.cdx-page-hidden .cdx-galaxy-dust,
+html.cdx-page-hidden .cdx-galaxy-stars i,
+html.cdx-page-hidden .cdx-galaxy-streak,
+html.cdx-page-hidden .cdx-site .cdx-about-art,
+html.cdx-page-hidden .cdx-site .cdx-about-art *,
+html.cdx-page-hidden .cdx-marquee-track {
+  animation-play-state: paused !important;
 }
 
-.cdx-site .cdx-marquee-track > span:nth-child(2) {
+@media (hover: none), (pointer: coarse) {
+  .cdx-site .cdx-marquee-track {
+    animation-play-state: paused !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cdx-ambient-blob,
+  .cdx-ambient-grid,
+  .cdx-galaxy-nebula,
+  .cdx-galaxy-dust,
+  .cdx-galaxy-stars i,
+  .cdx-galaxy-streak,
+  .cdx-hero-copy--unfold::before,
+  .cdx-hero-pfp::before,
+  .cdx-hero-pfp::after,
+  .cdx-hero-unfold-line,
+  .cdx-hero-headline--unfold .cdx-hero-headline-line,
+  .cdx-hero-headline--unfold .cdx-hero-headline-line--gold::before,
+  .cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after,
+  .cdx-site .cdx-about-art,
+  .cdx-site .cdx-about-art .cdx-about-photo-frame,
+  .cdx-site .cdx-about-art .cdx-portrait-chip,
+  .cdx-site .cdx-about-art .cdx-portrait-orbit,
+  .cdx-site .cdx-about-art .cdx-portrait-orbit svg,
+  .cdx-site .cdx-about-art .cdx-portrait-badge,
+  .cdx-marquee-track {
+    animation: none !important;
+  }
+
+  .cdx-hero-headline--unfold .cdx-hero-headline-line {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .cdx-showreel--unfold .cdx-showreel-curtain,
+  .cdx-site .cdx-button,
+  .cdx-site .cdx-header-cta {
+    transition: none !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduced-motion always wins over adaptive quality and desktop motion rules. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-cdx-quality="5"] .cdx-site .cdx-about-art,
+  html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-chip,
+  html[data-cdx-quality="5"] .cdx-site .cdx-about-art .cdx-portrait-orbit svg,
+  html.cdx-reduced-motion .cdx-ambient-blob,
+  html.cdx-reduced-motion .cdx-ambient-grid,
+  html.cdx-reduced-motion .cdx-galaxy-nebula,
+  html.cdx-reduced-motion .cdx-galaxy-dust,
+  html.cdx-reduced-motion .cdx-galaxy-stars i,
+  html.cdx-reduced-motion .cdx-galaxy-streak,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-about-photo-frame,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-portrait-glow,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-portrait-chip,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-portrait-orbit,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-portrait-orbit svg,
+  html.cdx-reduced-motion .cdx-site .cdx-about-art .cdx-portrait-badge,
+  html.cdx-reduced-motion .cdx-site .cdx-marquee-track {
+    animation: none !important;
+  }
+}
+
+/* ======================================================================
+   CROWNDEX — UNFOLD TEXT-ONLY REVEAL FIX
+   Keep the gradient and light sweep clipped to the glyphs. The old ::after
+   glow painted a full rectangular layer behind the word; remove that layer
+   and pulse the glyph-shaped drop shadow instead. A one-time clip-path wipe
+   restores the word reveal without adding a persistent animation surface.
+   ====================================================================== */
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold {
+  isolation: isolate;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  background-color: transparent !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold:nth-child(3) {
+  animation-name: cdx-unfold-line-in, cdx-unfold-text-reveal, cdx-unfold-text-glow;
+  animation-duration: .9s, 1.15s, 5.8s;
+  animation-timing-function: var(--cdx-ease-out), cubic-bezier(.16, 1, .3, 1), ease-in-out;
+  animation-delay: .24s, .24s, 1s;
+  animation-iteration-count: 1, 1, infinite;
+  animation-fill-mode: forwards, forwards, both;
+}
+
+/* The sweep remains a second text layer and is already clipped to the glyphs. */
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::before {
+  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
+}
+
+/* Remove the old unmasked rectangular glow panel completely. */
+.cdx-hero-headline--unfold .cdx-hero-headline-line--gold::after {
+  content: none !important;
   display: none !important;
+  animation: none !important;
 }
 
-/* The native cursor remains available in lite/reduced-motion mode.
-   On normal desktop pointers, keep both gold cursor elements visible. */
-html:not(.cdx-lite):not(.cdx-reduced-motion) .cdx-cursor-dot,
-html:not(.cdx-lite):not(.cdx-reduced-motion) .cdx-cursor-ring {
-  display: block;
+@keyframes cdx-unfold-text-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
 }
 
-/* Preserve the one-shot headline entrance, intro transition, modal transitions,
-   and the approved Grand Unfolding curtain open/close choreography. */
+@keyframes cdx-unfold-text-glow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 10px 18px rgba(8, 10, 22, .34))
+      drop-shadow(0 0 18px rgba(145, 243, 255, .13))
+      drop-shadow(0 0 24px rgba(183, 151, 255, .13));
+  }
+  50% {
+    filter:
+      drop-shadow(0 10px 18px rgba(8, 10, 22, .34))
+      drop-shadow(0 0 24px rgba(145, 243, 255, .22))
+      drop-shadow(0 0 32px rgba(183, 151, 255, .20));
+  }
+}
