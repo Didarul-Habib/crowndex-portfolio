@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, Check, Clapperboard, Eye, EyeOff, Film, FileText, FolderUp, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, LogOut, Menu, Pencil, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, Check, Clapperboard, Eye, EyeOff, Film, FileText, FolderUp, Image as ImageIcon, Inbox, LayoutDashboard, LoaderCircle, LockKeyhole, LogOut, Menu, Pencil, Plus, RefreshCw, Save, Settings2, ShieldCheck, Sparkles, Trash2, Users, X } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { backend, DEFAULT_SITE_CONTENT, normalizeSiteContent, type CreatorProgram, type SiteContent, type SiteSettings, validHttps, validXUrl } from './lib/content';
 import type { Work } from './CrownDEXV4';
+import AdminInbox from './AdminInbox';
 import './admin.css';
 
-type Page = 'overview' | 'videos' | 'programs' | 'identity' | 'content';
+type Page = 'overview' | 'inbox' | 'videos' | 'programs' | 'identity' | 'content';
 type AuthStage = 'loading' | 'signed-out' | 'not-authorized' | 'authorized';
 type Source = 'x' | 'uploaded';
 type VideoForm = { id: string; title: string; description: string; category: string; url: string; video_url: string; thumbnail: string; featured: boolean; published: boolean; source: Source };
@@ -152,6 +153,7 @@ const siteContentGroups: Array<{ title: string; description: string; fields: Arr
 
 const sidebar = [
   { key: 'overview' as Page, title: 'Overview', icon: LayoutDashboard },
+  { key: 'inbox' as Page, title: 'Inbox', icon: Inbox },
   { key: 'videos' as Page, title: 'Portfolio & videos', icon: Clapperboard },
   { key: 'programs' as Page, title: 'Creator programs', icon: Users },
   { key: 'identity' as Page, title: 'Profile & links', icon: Settings2 },
@@ -170,6 +172,8 @@ export default function AdminStudio() {
   const [page, setPage] = useState<Page>('overview');
   const [mobileNav, setMobileNav] = useState(false);
   const [works, setWorks] = useState<Work[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [inboxReady, setInboxReady] = useState(false);
   const [programs, setPrograms] = useState<CreatorProgram[]>([]);
   const [settings, setSettings] = useState<SiteSettings>(initialSettings);
   const [siteContent, setSiteContent] = useState<SiteContent>(() => ({ ...DEFAULT_SITE_CONTENT }));
@@ -183,6 +187,17 @@ export default function AdminStudio() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const uploadInput = useRef<HTMLInputElement>(null);
+
+  const loadInboxUnread = useCallback(async () => {
+    if (!backend) return;
+    const { count, error } = await backend
+      .from('contact_messages')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null)
+      .is('archived_at', null);
+    if (!error) { setUnreadMessages(count ?? 0); setInboxReady(true); }
+    else setInboxReady(false);
+  }, []);
 
   const load = useCallback(async () => {
     if (!backend) return;
@@ -222,6 +237,21 @@ export default function AdminStudio() {
     const { data: subscription } = backend.auth.onAuthStateChange(() => { window.setTimeout(() => { if (active) void verify(); }, 0); });
     return () => { active = false; subscription.subscription.unsubscribe(); };
   }, [load]);
+
+  useEffect(() => {
+    const client = backend;
+    if (stage !== 'authorized' || !client) return;
+    void loadInboxUnread();
+    const channel = client
+      .channel('crowndex-inbox-sidebar')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contact_messages' },
+        () => { void loadInboxUnread(); },
+      )
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [stage, loadInboxUnread]);
 
   async function signIn(e: FormEvent) {
     e.preventDefault();
@@ -403,7 +433,7 @@ export default function AdminStudio() {
     if (!error) await load();
   }
 
-  if (!backend) return <div className="admin-login-shell"><div className="admin-login-panel"><StudioMark/><div className="admin-lock-icon"><Settings2 size={31}/></div><h1>Studio not connected.</h1><p>Your local portfolio still works. To activate the real admin panel, connect your Supabase project using the included <code>setup-admin.ps1</code> and run <code>supabase/schema.sql</code> in its SQL editor.</p><a className="admin-primary-link" href="/">← Back to portfolio</a></div></div>;
+  if (!backend) return <div className="admin-login-shell"><div className="admin-login-panel"><StudioMark/><div className="admin-lock-icon"><Settings2 size={31}/></div><h1>Studio not connected.</h1><p>Your local portfolio still works. To activate the real admin panel, connect the existing Supabase project using the approved local setup instructions. Do not run an unverified schema file against an existing production database.</p><a className="admin-primary-link" href="/">← Back to portfolio</a></div></div>;
   if (stage === 'loading') return <div className="admin-login-shell"><div className="admin-loading"><LoaderCircle className="admin-spinner" size={28}/> Verifying studio access…</div></div>;
   if (stage === 'signed-out') return <div className="admin-login-shell"><form className="admin-login-panel" onSubmit={signIn}><StudioMark/><div className="admin-lock-icon"><LockKeyhole size={30}/></div><span className="admin-eyebrow">PRIVATE / CONTENT MANAGEMENT</span><h1>Welcome back.</h1><p>Secure entry to the CrownDEX content studio. Only approved administrators can edit the public site.</p><label htmlFor="admin-email">Email address</label><input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" placeholder="you@example.com"/><label htmlFor="admin-password">Password</label><div className="admin-password-row"><input id="admin-password" type={showPassword ? 'text':'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? 'Hide password':'Show password'}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>{notice && <p role="alert" className="admin-error">{notice}</p>}<button className="admin-action" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Enter the studio'} <ArrowRight size={18}/></button><a className="admin-back" href="/"><ArrowLeft size={15}/> Back to portfolio</a></form></div>;
   if (stage === 'not-authorized') return <div className="admin-login-shell"><div className="admin-login-panel"><StudioMark/><ShieldCheck size={37}/><h1>Access restricted.</h1><p>This account is signed in, but it is not on the approved CrownDEX administrator list.</p><button className="admin-action" onClick={logOut}>Sign out <LogOut size={17}/></button></div></div>;
@@ -412,13 +442,15 @@ export default function AdminStudio() {
   const livePrograms = programs.filter(p => p.published !== false).length;
   const currentTab = sidebar.find(t => t.key === page)?.title || 'Overview';
   return <div className="admin-shell">
-    <aside className={`admin-sidebar ${mobileNav ? 'admin-sidebar-open':''}`} aria-label="Studio navigation"><div className="admin-sidebar-top"><StudioMark/><button className="admin-sidebar-close" onClick={() => setMobileNav(false)} aria-label="Close sidebar"><X/></button></div><div className="admin-side-label">WORKSPACE</div><nav>{sidebar.map(item => <button key={item.key} className={`admin-navitem ${page === item.key ? 'admin-nav-active':''}`} onClick={() => { setPage(item.key); setMobileNav(false); setNotice(''); setShowVideoForm(false); setShowProgramForm(false); }}><item.icon size={19}/>{item.title}<ArrowUpRight className="admin-nav-arrow" size={15}/></button>)}</nav><div className="admin-sidebar-foot"><div><span className="admin-online-dot"/> SUPABASE CONNECTED</div><a href="/" target="_blank" rel="noopener noreferrer"><Eye size={17}/> View live portfolio <ArrowUpRight size={15}/></a><button onClick={logOut}><LogOut size={17}/> Sign out</button></div></aside>
+    <aside className={`admin-sidebar ${mobileNav ? 'admin-sidebar-open':''}`} aria-label="Studio navigation"><div className="admin-sidebar-top"><StudioMark/><button className="admin-sidebar-close" onClick={() => setMobileNav(false)} aria-label="Close sidebar"><X/></button></div><div className="admin-side-label">WORKSPACE</div><nav>{sidebar.map(item => <button key={item.key} className={`admin-navitem ${page === item.key ? 'admin-nav-active':''}`} onClick={() => { setPage(item.key); setMobileNav(false); setNotice(''); setShowVideoForm(false); setShowProgramForm(false); }}><item.icon size={19}/>{item.title}{item.key === 'inbox' && inboxReady && unreadMessages > 0 && <span className="admin-nav-count">{unreadMessages > 99 ? '99+' : unreadMessages}</span>}<ArrowUpRight className="admin-nav-arrow" size={15}/></button>)}</nav><div className="admin-sidebar-foot"><div><span className="admin-online-dot"/> SUPABASE CONNECTED</div><a href="/" target="_blank" rel="noopener noreferrer"><Eye size={17}/> View live portfolio <ArrowUpRight size={15}/></a><button onClick={logOut}><LogOut size={17}/> Sign out</button></div></aside>
     {mobileNav && <button aria-label="Close navigation" className="admin-backdrop" onClick={() => setMobileNav(false)}/>}
-    <div className="admin-main"><header className="admin-topbar"><div className="admin-top-left"><button className="admin-mobile-toggle" aria-label="Open studio navigation" onClick={() => setMobileNav(true)}><Menu size={23}/></button><span className="admin-breadcrumb">STUDIO <span>/</span> {currentTab.toUpperCase()}</span></div><div className="admin-top-right"><span className="admin-user">{user?.email}</span><a href="/" target="_blank" rel="noopener noreferrer">Live site <ArrowUpRight size={16}/></a></div></header>
-    <main className="admin-content"><div className="admin-heading"><div><span className="admin-eyebrow">CROWNDEX / CONTROL ROOM</span><h1>{page === 'overview' ? 'Your creative universe.' : currentTab}</h1><p>{page === 'overview' ? 'Manage films, creator programs and your profile.' : page === 'videos' ? 'Upload films, set covers and arrange your reel.' : page === 'programs' ? 'Manage your verified creator memberships.' : page === 'identity' ? 'Update your photo, biography and social links.' : 'Edit the public website copy, imagery and section labels without changing source code.'}</p></div>{page === 'videos' && !showVideoForm && <button className="admin-action admin-heading-action" onClick={() => beginVideo()}><Plus size={18}/> Add project</button>}{page === 'programs' && !showProgramForm && <button className="admin-action admin-heading-action" onClick={() => beginProgram()}><Plus size={18}/> Add program</button>}</div>
+    <div className="admin-main"><header className="admin-topbar"><div className="admin-top-left"><button className="admin-mobile-toggle" aria-label="Open studio navigation" onClick={() => setMobileNav(true)}><Menu size={23}/></button><span className="admin-breadcrumb">STUDIO <span>/</span> {currentTab.toUpperCase()}</span></div><div className="admin-top-right"><button className="admin-top-refresh" type="button" onClick={() => { void load(); void loadInboxUnread(); }} title="Refresh studio data"><RefreshCw size={14}/> Refresh</button><span className="admin-user">{user?.email}</span><a href="/" target="_blank" rel="noopener noreferrer">Live site <ArrowUpRight size={16}/></a></div></header>
+    <main className="admin-content"><div className="admin-heading"><div><span className="admin-eyebrow">CROWNDEX / CONTROL ROOM</span><h1>{page === 'overview' ? 'Your creative universe.' : currentTab}</h1><p>{page === 'overview' ? 'Manage films, creator programs and your profile.' : page === 'videos' ? 'Upload films, set covers and arrange your reel.' : page === 'programs' ? 'Manage your verified creator memberships.' : page === 'identity' ? 'Update your photo, biography and social links.' : page === 'inbox' ? 'Read and manage enquiries sent through your public contact form.' : 'Edit the public website copy, imagery and section labels without changing source code.'}</p></div>{page === 'videos' && !showVideoForm && <button className="admin-action admin-heading-action" onClick={() => beginVideo()}><Plus size={18}/> Add project</button>}{page === 'programs' && !showProgramForm && <button className="admin-action admin-heading-action" onClick={() => beginProgram()}><Plus size={18}/> Add program</button>}</div>
     {notice && <div className="admin-notice" role="status"><Sparkles size={16}/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notice"><X size={17}/></button></div>}
 
-    {page === 'overview' && <><section className="admin-stat-grid"><div className="admin-stat"><span><Film size={20}/> PORTFOLIO</span><strong>{works.length.toString().padStart(2,'0')}</strong><small>{published} published / {works.length-published} drafts</small></div><div className="admin-stat"><span><Users size={20}/> CREATOR PROGRAMS</span><strong>{programs.length.toString().padStart(2,'0')}</strong><small>{livePrograms} visible on the public site</small></div><div className="admin-stat"><span><ShieldCheck size={20}/> ACCESS</span><strong className="admin-stat-word">PRIVATE</strong><small>Protected by Supabase authentication + RLS</small></div></section><section className="admin-overview-grid"><article className="admin-panel"><span className="admin-eyebrow">QUICK ACTIONS</span><h2>Keep the momentum.</h2><div className="admin-quick-actions"><button onClick={() => beginVideo()}><Clapperboard size={22}/><span><strong>Publish a new film</strong><small>X post plus an MP4 / WebM preview</small></span><ArrowUpRight size={19}/></button><button onClick={() => beginProgram()}><Users size={22}/><span><strong>Add a creator program</strong><small>Name, role, badge and website link</small></span><ArrowUpRight size={19}/></button><button onClick={() => setPage('identity')}><Settings2 size={22}/><span><strong>Refresh your story</strong><small>Creator bio and contact links</small></span><ArrowUpRight size={19}/></button><button onClick={() => setPage('content')}><FileText size={22}/><span><strong>Edit website content</strong><small>Home, services, contact, footer and visuals</small></span><ArrowUpRight size={19}/></button></div></article><article className="admin-panel admin-overview-note"><span className="admin-eyebrow">PUBLISHING STATUS</span><div className="admin-orbit-icon"><Sparkles size={42}/></div><h2>Changes appear live.</h2><p>New projects and program edits are saved to your secure database. Your published portfolio fetches them from Supabase without a Git push or Cloudflare code deployment.</p><p className="admin-muted">Only published items are visible to visitors. Keep drafts private while you refine them.</p></article></section></>}
+    {page === 'overview' && <><section className="admin-stat-grid"><div className="admin-stat"><span><Film size={20}/> PORTFOLIO</span><strong>{works.length.toString().padStart(2,'0')}</strong><small>{published} published / {works.length-published} drafts</small></div><div className="admin-stat"><span><Users size={20}/> CREATOR PROGRAMS</span><strong>{programs.length.toString().padStart(2,'0')}</strong><small>{livePrograms} visible on the public site</small></div><div className="admin-stat"><span><ShieldCheck size={20}/> ACCESS</span><strong className="admin-stat-word">PRIVATE</strong><small>Protected by Supabase authentication + RLS</small></div></section><section className="admin-overview-grid"><article className="admin-panel"><span className="admin-eyebrow">QUICK ACTIONS</span><h2>Keep the momentum.</h2><div className="admin-quick-actions"><button onClick={() => beginVideo()}><Clapperboard size={22}/><span><strong>Publish a new film</strong><small>X post plus an MP4 / WebM preview</small></span><ArrowUpRight size={19}/></button><button onClick={() => beginProgram()}><Users size={22}/><span><strong>Add a creator program</strong><small>Name, role, badge and website link</small></span><ArrowUpRight size={19}/></button><button onClick={() => setPage('identity')}><Settings2 size={22}/><span><strong>Refresh your story</strong><small>Creator bio and contact links</small></span><ArrowUpRight size={19}/></button><button onClick={() => setPage('content')}><FileText size={22}/><span><strong>Edit website content</strong><small>Home, services, contact, footer and visuals</small></span><ArrowUpRight size={19}/></button><button onClick={() => setPage('inbox')}><Inbox size={22}/><span><strong>Open your inbox</strong><small>{inboxReady ? `${unreadMessages} unread ${unreadMessages === 1 ? 'enquiry' : 'enquiries'} waiting` : 'View and manage website enquiries'}</small></span><ArrowUpRight size={19}/></button></div></article><article className="admin-panel admin-overview-note"><span className="admin-eyebrow">PUBLISHING STATUS</span><div className="admin-orbit-icon"><Sparkles size={42}/></div><h2>Changes appear live.</h2><p>New projects and program edits are saved to your secure database. Your published portfolio fetches them from Supabase without a Git push or Cloudflare code deployment.</p><p className="admin-muted">Only published items are visible to visitors. Keep drafts private while you refine them.</p></article></section></>}
+
+    {page === 'inbox' && <AdminInbox onUnreadChange={setUnreadMessages} />}
 
     {page === 'videos' && <>
     {showVideoForm ? <form className="admin-panel admin-editor" onSubmit={saveVideo}><div className="admin-form-head"><div><span className="admin-eyebrow">PROJECT EDITOR</span><h2>{videoForm.id ? 'Edit project' : 'New cinematic project'}</h2></div><button className="admin-icon-button" type="button" onClick={() => setShowVideoForm(false)} aria-label="Close editor"><X/></button></div>

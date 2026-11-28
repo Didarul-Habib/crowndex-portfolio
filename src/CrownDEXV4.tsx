@@ -30,6 +30,25 @@ import embedData from './data/embeds.generated.json';
 import xLiveData from './data/x-live.generated.json';
 import { backend, fetchLiveContent, DEFAULT_SITE_CONTENT, type CreatorProgram, type SiteSettings, type SiteContent } from './lib/content';
 
+type TurnstileRenderOptions = {
+  sitekey: string;
+  theme?: 'light' | 'dark' | 'auto';
+  size?: 'normal' | 'compact' | 'flexible';
+  callback?: (token: string) => void;
+  'expired-callback'?: () => void;
+  'error-callback'?: () => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
 export type Work = {
   id: string;
   url: string;
@@ -613,6 +632,7 @@ function Timecode({ reduced }: { reduced: boolean }) {
 function HeroShowreel({ work, project, reduced, onOpen, filmEndedSignal, posterOverride, chipOne, chipTwo, ratioLabel, recLabel, captionLabel, fallbackTitle }: { work?: Work; project?: ProjectMeta; reduced: boolean; onOpen: () => void; filmEndedSignal: number; posterOverride: string; chipOne: string; chipTwo: string; ratioLabel: string; recLabel: string; captionLabel: string; fallbackTitle: string }) {
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   // The theatre starts fully closed, opens once on mount, and closes again
   // only after the one-shot hero reel reaches its natural end.
   const [curtainState, setCurtainState] = useState<'closed' | 'opening' | 'open' | 'closing'>('closed');
@@ -707,14 +727,14 @@ function HeroShowreel({ work, project, reduced, onOpen, filmEndedSignal, posterO
   const displayRec = recLabel || 'REC';
 
   return (
-    <div ref={containerRef} className={`cdx-showreel cdx-showreel--unfold is-${curtainState}`} data-curtain-state={curtainState} data-video-ended={videoEnded ? 'true' : 'false'} aria-label="CrownDEX 16:9 widescreen showreel">
+    <div ref={containerRef} className={`cdx-showreel cdx-showreel--unfold is-${curtainState}`} data-curtain-state={curtainState} data-video-ended={videoEnded ? 'true' : 'false'} data-video-playing={videoPlaying ? 'true' : 'false'} aria-label="CrownDEX showreel">
       <div className="cdx-showreel-stage-lights" aria-hidden="true">
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--one" />
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--two" />
         <span className="cdx-showreel-stage-light cdx-showreel-stage-light--three" />
       </div>
       {videoUrl && !videoFailed ? (
-        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onLoadedMetadata={(event) => { event.currentTarget.defaultPlaybackRate = 1; event.currentTarget.playbackRate = 1; }} onPlay={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onEnded={() => { pauseManagedVideo(videoRef.current); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
+        <video ref={videoRef} className="cdx-showreel-video" src={videoUrl} poster={displayPoster || undefined} muted playsInline autoPlay preload="auto" onLoadedMetadata={(event) => { event.currentTarget.defaultPlaybackRate = 1; event.currentTarget.playbackRate = 1; }} onPlay={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; setVideoPlaying(true); }} onPause={() => setVideoPlaying(false)} onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }} onEnded={() => { pauseManagedVideo(videoRef.current); setVideoPlaying(false); setVideoEnded(true); }} onError={() => { pauseManagedVideo(videoRef.current); setVideoPlaying(false); setVideoFailed(true); }} aria-label="CrownDEX selected showreel" />
       ) : displayPoster ? (
         <img className="cdx-showreel-poster" src={displayPoster} alt={`${work && project ? titleFor(work, 0, project) : 'CrownDEX showreel'} poster`} fetchPriority="high" decoding="async" width={1280} height={720} />
       ) : (
@@ -964,25 +984,123 @@ function FilmViewer({
 }
 
 function ContactForm({ email, content }: { email: string; content: SiteContent }) {
+  const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '').trim();
+  const captchaRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
   const [notice, setNotice] = useState('');
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!siteKey || !captchaRef.current) return;
+    let active = true;
+    let script = document.getElementById('crowndex-turnstile-script') as HTMLScriptElement | null;
+
+    const renderWidget = () => {
+      if (!active || !window.turnstile || !captchaRef.current || widgetIdRef.current) return;
+      widgetIdRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        theme: 'dark',
+        size: 'flexible',
+        callback: (token) => {
+          setCaptchaToken(token);
+          setCaptchaError('');
+          setNotice('');
+        },
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setCaptchaError('The security check could not load. Refresh the page and try again.');
+        },
+      });
+    };
+
+    const onScriptError = () => {
+      if (active) setCaptchaError('The security check is temporarily unavailable.');
+    };
+
+    const createdScript = !script;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'crowndex-turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+    }
+
+    script.addEventListener('load', renderWidget);
+    script.addEventListener('error', onScriptError);
+    if (createdScript) document.head.appendChild(script);
+    if (window.turnstile) renderWidget();
+
+    return () => {
+      active = false;
+      script?.removeEventListener('load', renderWidget);
+      script?.removeEventListener('error', onScriptError);
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+      widgetIdRef.current = null;
+    };
+  }, [siteKey]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const name = String(form.get('name') || '').trim();
     const senderEmail = String(form.get('email') || '').trim();
     const projectType = String(form.get('projectType') || '').trim();
     const brief = String(form.get('brief') || '').trim();
-    const subject = encodeURIComponent(`CrownDEX project enquiry — ${projectType || 'New project'}`);
-    const body = [`Hello CrownDEX,`, '', `Name: ${name}`, `Email: ${senderEmail}`, `Project: ${projectType}`, '', brief].join('\n');
-    if (email) {
-      window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
-      setNotice('Your email app should open with the project brief ready to send.');
+    const website = String(form.get('website') || '').trim();
+
+    if (!backend) {
+      setNotice('The contact inbox is not connected yet. Please use the direct contact links.');
       return;
     }
-    if (navigator.clipboard?.writeText) {
-      void navigator.clipboard.writeText(body).then(() => setNotice('Your brief has been copied. Send it using your preferred contact channel.')).catch(() => setNotice('Copy your brief and send it using your preferred contact channel.'));
-    } else setNotice('Copy your brief and send it using your preferred contact channel.');
+    if (!siteKey) {
+      setNotice('Secure inbox submission is not configured yet. Please use the direct contact links.');
+      return;
+    }
+    if (!captchaToken) {
+      setNotice('Complete the security check before sending your enquiry.');
+      return;
+    }
+    if (!name || !senderEmail || !brief) {
+      setNotice('Please complete your name, email and project message.');
+      return;
+    }
+
+    setSending(true);
+    setNotice('');
+    try {
+      const { data, error } = await backend.functions.invoke('submit-contact', {
+        body: {
+          name,
+          email: senderEmail,
+          projectType,
+          message: brief,
+          turnstileToken: captchaToken,
+          website,
+        },
+      });
+      if (error || !data?.ok) {
+        throw new Error('The message could not be submitted. Please try again or use a direct contact link.');
+      }
+      setNotice('Your message has been sent to the CrownDEX inbox. Thank you for reaching out.');
+      formElement.reset();
+      setCaptchaToken('');
+      if (widgetIdRef.current) window.turnstile?.reset(widgetIdRef.current);
+    } catch {
+      setNotice('We could not send your message right now. Please try again or use a direct contact link.');
+      setCaptchaToken('');
+      if (widgetIdRef.current) window.turnstile?.reset(widgetIdRef.current);
+    } finally {
+      setSending(false);
+    }
   };
+
   return (
     <form className="cdx-contact-form" onSubmit={submit}>
       <div className="cdx-form-row">
@@ -993,9 +1111,27 @@ function ContactForm({ email, content }: { email: string; content: SiteContent }
         <select name="projectType" defaultValue={content.contactProjectOptionOne}><option>{content.contactProjectOptionOne}</option><option>{content.contactProjectOptionTwo}</option><option>{content.contactProjectOptionThree}</option><option>{content.contactProjectOptionFour}</option><option>{content.contactProjectOptionFive}</option></select>
       </label>
       <label>{content.contactBriefLabel}<textarea name="brief" rows={4} placeholder={content.contactBriefPlaceholder} required maxLength={2500} /></label>
-      <button className="cdx-button cdx-button-gold cdx-form-submit cdx-magnetic" type="submit">{email ? content.contactEmailButton : content.contactFormButton} <ArrowUpRight size={17} /></button>
+      <input
+        className="cdx-contact-honeypot"
+        name="website"
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+      />
+      {siteKey ? (
+        <div className="cdx-contact-security">
+          <div ref={captchaRef} />
+          {captchaError && <p className="cdx-form-notice" role="alert">{captchaError}</p>}
+        </div>
+      ) : (
+        <p className="cdx-form-hint">Secure contact submissions are being configured. You can still reach me through the direct contact links.</p>
+      )}
+      <button className="cdx-button cdx-button-gold cdx-form-submit cdx-magnetic" type="submit" disabled={sending || !backend || !siteKey || !captchaToken}>
+        {sending ? 'Sending enquiry…' : 'Send project enquiry'} <ArrowUpRight size={17} />
+      </button>
       {notice && <p className="cdx-form-notice" role="status">{notice}</p>}
-      {!email && <p className="cdx-form-hint">{content.contactFormHint}</p>}
+      {email && <a className="cdx-contact-direct-email" href={`mailto:${email}`}>Prefer email? Write directly to {email}</a>}
     </form>
   );
 }

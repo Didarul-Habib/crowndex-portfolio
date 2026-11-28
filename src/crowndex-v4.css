@@ -5961,3 +5961,48 @@ html.cdx-page-hidden .cdx-marquee-track {
       drop-shadow(0 0 32px rgba(183, 151, 255, .20));
   }
 }
+
+
+/* CrownDEX showreel: keep the poster treatment, but clear stage labels
+   and decorative lights whenever the actual film is playing. */
+.cdx-showreel[data-video-playing="true"] .cdx-showreel-stage-lights,
+.cdx-showreel[data-video-playing="true"] .cdx-showreel-chip,
+.cdx-showreel[data-video-playing="true"] .cdx-showreel-ratio {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity .28s ease, visibility .28s ease;
+}
+
+/* Contact form security and direct-email fallback. */
+.cdx-contact-honeypot {
+  position: absolute !important;
+  left: -10000px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.cdx-contact-security {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.cdx-contact-direct-email {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--cdx-muted, #b8b2c4);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cdx-contact-form .cdx-form-submit:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  filter: saturate(.55);
+}
